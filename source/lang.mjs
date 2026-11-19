@@ -15,6 +15,7 @@ export default {
     detail: 'Detail', low: 'Low', medium: 'Medium', high: 'High',
     fly: 'Fly', updown: 'Down / up', faster: 'Faster', views: 'Viewpoints',
     menu: 'Menu', sound: 'Sound', stats: 'Stats',
+    repo: 'Source on GitHub',
     touch: 'Hold a finger to fly · drag to turn · second finger - faster',
     js: {
       noGpu: 'This scene needs WebGPU. Open it in a recent Chrome or Edge.',
