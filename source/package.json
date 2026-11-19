@@ -1,0 +1,14 @@
+{
+  "name": "htone",
+  "private": true,
+  "description": "A procedural night courtyard rendered with WebGPU, bundled into one HTML file",
+  "type": "module",
+  "scripts": {
+    "build": "node build.mjs",
+    "build:readable": "node build.mjs --readable",
+    "build:dev": "node build.mjs --dev"
+  },
+  "devDependencies": {
+    "esbuild": "^0.28.2"
+  }
+}
