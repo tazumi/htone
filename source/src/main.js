@@ -46,9 +46,10 @@ const tDummy = tex(1, 1, DEPTH, TU.RENDER_ATTACHMENT | TU.TEXTURE_BINDING);
 const tDetail = tex(1024, 1024, 'rgba8unorm', TU.RENDER_ATTACHMENT | TU.TEXTURE_BINDING, { mips: 11 });
 const tMap = tex(512, 512, 'rgba8unorm', TU.TEXTURE_BINDING | TU.COPY_DST);
 const tLamp = tex(128, 64, 'rgba8uint', TU.TEXTURE_BINDING | TU.COPY_DST);
+const tAtlas = tex(ATLAS, ATLAS, 'rgba8unorm', TU.TEXTURE_BINDING | TU.COPY_DST | TU.RENDER_ATTACHMENT, { mips: 12 });
 
 // the uniform block G (see shaders.js): offsets in floats
-const U_CAM = 16, U_RIGHT = 20, U_UP = 24, U_FWD = 28, U_RES = 32, U_MIS = 36, U_WIND = 40, U_PAP = 44, U_TR = 48, U_RC = 52, U_LAMP = 68;
+const U_CAM = 16, U_RIGHT = 20, U_UP = 24, U_FWD = 28, U_RES = 32, U_MIS = 36, U_WIND = 40, U_PAP = 44, U_TR = 48, U_TR2 = 52, U_PL = 56, U_RC = 60, U_LAMP = U_RC + NRC * 4;
 const UB = new Float32Array(U_LAMP + NL * 8);
 const ubo = device.createBuffer({ size: UB.byteLength, usage: BU.UNIFORM | BU.COPY_DST });
 LAMPS.forEach((l, i) => UB.set([l.x, l.y, l.z, l.r, l.c[0], l.c[1], l.c[2], l.t], U_LAMP + i * 8));
@@ -58,10 +59,11 @@ const bgl0 = device.createBindGroupLayout({ entries: [
   { binding: 0, visibility: VF, buffer: {} },
   { binding: 1, visibility: VF, sampler: {} }, { binding: 2, visibility: VF, sampler: {} }, { binding: 3, visibility: VF, sampler: { type: 'comparison' } },
   { binding: 4, visibility: VF, texture: { sampleType: 'depth' } },
-  { binding: 5, visibility: VF, texture: {} }, { binding: 6, visibility: VF, texture: {} }, { binding: 7, visibility: VF, texture: { sampleType: 'uint' } }] });
+  { binding: 5, visibility: VF, texture: {} }, { binding: 6, visibility: VF, texture: {} }, { binding: 7, visibility: VF, texture: { sampleType: 'uint' } },
+  { binding: 8, visibility: VF, texture: {} }] });
 const mkBG0 = (u, sh) => device.createBindGroup({ layout: bgl0, entries: [
   { binding: 0, resource: { buffer: u } }, { binding: 1, resource: sRep }, { binding: 2, resource: sClamp }, { binding: 3, resource: sCmp },
-  { binding: 4, resource: sh.createView() }, { binding: 5, resource: tDetail.createView() }, { binding: 6, resource: tMap.createView() }, { binding: 7, resource: tLamp.createView() }] });
+  { binding: 4, resource: sh.createView() }, { binding: 5, resource: tDetail.createView() }, { binding: 6, resource: tMap.createView() }, { binding: 7, resource: tLamp.createView() }, { binding: 8, resource: tAtlas.createView() }] });
 const bg0 = mkBG0(ubo, tShadow);
 const pl0 = device.createPipelineLayout({ bindGroupLayouts: [bgl0] });
 
@@ -80,6 +82,7 @@ const vbSolid = { arrayStride: 16, attributes: [A(0, 0, 'float32x3'), A(1, 12, '
 const ibSolid = { arrayStride: 48, stepMode: 'instance', attributes: [A(2, 0, 'float32x4'), A(3, 16, 'float32x4'), A(4, 32, 'float32x4')] };
 const ibLeaf = { arrayStride: 36, stepMode: 'instance', attributes: [A(0, 0, 'float32x4'), A(1, 16, 'float32x4'), A(2, 32, 'unorm8x4')] };
 const ibPair = { arrayStride: 32, stepMode: 'instance', attributes: [A(0, 0, 'float32x4'), A(1, 16, 'float32x4')] };
+const ibDec = { arrayStride: 48, stepMode: 'instance', attributes: [A(0, 0, 'float32x4'), A(1, 16, 'float32x4'), A(2, 32, 'float32x4')] };
 const ibSnow = { arrayStride: 16, stepMode: 'instance', attributes: [A(0, 0, 'float32x4')] };
 
 const scenePipe = (m, vsE, fsE, buffers, o = {}) => device.createRenderPipeline({ layout: pl0,
@@ -93,15 +96,17 @@ const shadowPipe = (m, vsE, buffers) => device.createRenderPipeline({ layout: pl
   depthStencil: { format: DEPTH, depthWriteEnabled: true, depthCompare: 'less', depthBias: 2, depthBiasSlopeScale: 1.5 } });
 
 await say(T.shaders, 0.1, 300);
-const mSolid = mod(W_SOLID), mWin = mod(W_WIN), mLeaf = mod(W_LEAF), mSpr = mod(W_SPR);
+const mDec = mod(W_DEC), mSolid = mod(W_SOLID), mWin = mod(W_WIN), mLeaf = mod(W_LEAF), mSpr = mod(W_SPR);
 const ADD = { color: { srcFactor: 'one', dstFactor: 'one' }, alpha: { srcFactor: 'one', dstFactor: 'one' } };
 const OVER = { color: { srcFactor: 'one', dstFactor: 'one-minus-src-alpha' }, alpha: { srcFactor: 'one', dstFactor: 'one-minus-src-alpha' } };
 const pSolid = scenePipe(mSolid, 'vs', 'fs', [vbSolid, ibSolid]);
 const pWin = scenePipe(mWin, 'vs', 'fs', [ibPair], { strip: true });
+const pDec = scenePipe(mDec, 'vs', 'fs', [ibDec], { strip: true, blend: OVER });
 const pLeaf = scenePipe(mLeaf, 'vs', 'fs', [ibLeaf], { strip: true, constants: { ROWS: 5 } });
 const pLeafF = scenePipe(mLeaf, 'vs', 'fs', [ibLeaf], { strip: true, constants: { ROWS: 3 } });
 const pBack = scenePipe(mSpr, 'vsB', 'fsB', [], { strip: true });
 const pSnow = scenePipe(mSpr, 'vsSnow', 'fsSnow', [ibSnow], { strip: true, blend: ADD });
+const pDrift = scenePipe(mSpr, 'vsDrift', 'fsDrift', [ibSnow], { strip: true, blend: ADD });
 const pGl = scenePipe(mSpr, 'vsGl', 'fsGl', [ibPair], { strip: true, blend: ADD });
 const pPap = scenePipe(mSpr, 'vsPap', 'fsPap', [ibPair], { strip: true });
 const pSt = scenePipe(mSpr, 'vsSt', 'fsSt', [ibPair], { strip: true, blend: OVER });
@@ -118,6 +123,11 @@ await say(T.houses, 0.45, 1500);
 keep('htoneLoad', 1);
 addEventListener('pagehide', () => keep('htoneLoad', ''));
 const Wd = makeWorld(), meshes = Wd.meshes;
+// the decal atlas, and the decals with their cells looked up by name
+const AT = makeAtlas();
+Q.copyExternalImageToTexture({ source: AT.cv }, { texture: tAtlas, premultipliedAlpha: true }, [ATLAS, ATLAS]);
+const decF = new Float32Array(Wd.decals.length * 12);
+Wd.decals.forEach((d, i) => { decF.set(d.slice(0, 8), i * 12); decF.set(AT.R[d[8]], i * 12 + 8); });
 
 // preset viewpoints (position, look-at), keys 1-6: at the window, among the cars, under the lamp, on the playground,
 // on the roof of the tower, by the railway
@@ -153,9 +163,10 @@ const FLY = new Float32Array([
 ]);
 const FLYN = FLY.length / 6, FLYT = 60, LUTN = 1024, flyLUT = new Float32Array(LUTN + 1);
 // per-frame float state lives in one preallocated array, so the frame loop allocates no heap numbers
-const F = new Float64Array(64), P6 = new Float64Array(6);
+const F = new Float64Array(128), P6 = new Float64Array(6);
 const CX = 0, CY = 1, CZ = 2, YAW = 3, PIT = 4, FX = 5, FY = 6, FZ = 7, RX = 8, RZ = 9, UX = 10, UY = 11, UZ = 12, VX = 13, VY = 14, VZ = 15, TIME = 16, FLT = 17, LAST = 18, GPU = 19, HUDT = 20, SPL = 21, MX = 22, MY = 23, MZ = 24,
-  GUST = 25, WX = 26, WZ = 27, PAP = 28, TRX = 29, TRD = 30, TRON = 31, FLK = 32, INR = 33, RC = 34; // RC: 4 x (x, direction, present)
+  GUST = 25, WX = 26, WZ = 27, PAP = 28, TRX = 29, TRD = 30, TRON = 31, FLK = 32, INR = 33, FRX = 34, FRD = 35, FRON = 36, PLX = 37, PLZ = 38, PLH = 39, PLON = 40, DRF = 41,
+  RC = 48; // RC: NRC x (x, direction, present, kind)
 // aim the camera from P6 = position + look-at point
 function aim() {
   const dx = P6[3] - P6[0], dy = P6[4] - P6[1], dz = P6[5] - P6[2];
@@ -194,6 +205,7 @@ const vbMesh = buf(allV, BU.VERTEX), ibMesh = buf(allI, BU.INDEX);
 const ibSolids = buf(Wd.data, BU.VERTEX), ibWin = buf(Wd.wins, BU.VERTEX), nWin = Wd.wins.length / 8;
 const ibGrass = buf(new Uint8Array(Wd.grass.buf), BU.VERTEX);
 const ibSnowB = buf(Wd.snow, BU.VERTEX), ibGlare = buf(Wd.glare, BU.VERTEX), ibSteam = buf(Wd.steam, BU.VERTEX), ibPaper = buf(Wd.paper, BU.VERTEX);
+const ibDecB = buf(decF, BU.VERTEX), nDec = Wd.decals.length;
 const nGlare = Wd.glare.length / 8, nSteam = Wd.steam.length / 8, nPaper = Wd.paper.length / 8;
 Q.writeTexture({ texture: tMap }, Wd.gm, { bytesPerRow: 2048 }, [512, 512]);
 Q.writeTexture({ texture: tLamp }, Wd.lg, { bytesPerRow: 512 }, [128, 64]);
@@ -207,10 +219,11 @@ const drawSolids = (r, sh) => { for (let i = 0; i < meshes.length; i++) { const 
   const e = device.createCommandEncoder();
   let r = e.beginRenderPass({ colorAttachments: [colorAtt(tDetail.createView({ baseMipLevel: 0, mipLevelCount: 1 }), true)] });
   r.setPipeline(p); r.draw(3); r.end();
-  for (let i = 1; i < 11; i++) {
-    r = e.beginRenderPass({ colorAttachments: [colorAtt(tDetail.createView({ baseMipLevel: i, mipLevelCount: 1 }), true)] });
-    r.setPipeline(pMip8); r.setBindGroup(0, blitBG(tDetail.createView({ baseMipLevel: i - 1, mipLevelCount: 1 }))); r.draw(3); r.end();
-  }
+  const mips = (tx, n) => { for (let i = 1; i < n; i++) {
+    r = e.beginRenderPass({ colorAttachments: [colorAtt(tx.createView({ baseMipLevel: i, mipLevelCount: 1 }), true)] });
+    r.setPipeline(pMip8); r.setBindGroup(0, blitBG(tx.createView({ baseMipLevel: i - 1, mipLevelCount: 1 }))); r.draw(3); r.end();
+  } };
+  mips(tDetail, 11); mips(tAtlas, 12);
   // every street lamp gets a tile of the atlas: the yard seen straight down from the lamp
   const TS = SHADOW / 4, vSh = tShadow.createView(), za = ZF / (ZF - ZN), zb = -ZF * ZN / (ZF - ZN);
   let first = true;
@@ -341,10 +354,13 @@ function render() {
   m[U_FWD] = fx; m[U_FWD + 1] = fy; m[U_FWD + 2] = fz; m[U_FWD + 3] = NEAR;
   m[U_MIS] = EXPO; m[U_MIS + 1] = RAYS; m[U_MIS + 2] = det; m[U_MIS + 3] = F[GUST];
   m[U_WIND] = F[WX]; m[U_WIND + 1] = 0; m[U_WIND + 2] = F[WZ]; m[U_WIND + 3] = F[GUST];
-  m[U_PAP] = F[PAP];
+  m[U_PAP] = F[PAP]; m[U_PAP + 1] = F[DRF];
   m[U_TR] = F[TRX]; m[U_TR + 1] = F[TRD]; m[U_TR + 2] = F[TRON];
-  for (let k = 0; k < 4; k++) { m[U_RC + k * 4] = F[RC + k * 3]; m[U_RC + k * 4 + 1] = F[RC + k * 3 + 1]; m[U_RC + k * 4 + 2] = F[RC + k * 3 + 2]; }
+  m[U_TR2] = F[FRX]; m[U_TR2 + 1] = F[FRD]; m[U_TR2 + 2] = F[FRON];
+  m[U_PL] = F[PLX]; m[U_PL + 1] = F[PLZ]; m[U_PL + 2] = F[PLH]; m[U_PL + 3] = F[PLON];
+  for (let k = 0; k < NRC * 4; k++) m[U_RC + k] = F[RC + k];
   { const o = U_LAMP + FLICK * 8 + 4, c = LAMPS[FLICK].c, f = F[FLK]; m[o] = c[0] * f; m[o + 1] = c[1] * f; m[o + 2] = c[2] * f; }
+  { const o = U_LAMP + TVL * 8 + 4, c = LAMPS[TVL].c, f = 0.55 + 0.45 * fract(sin(floor(F[TIME] * 3) * 127.1) * 43758.5453); m[o] = c[0] * f; m[o + 1] = c[1] * f; m[o + 2] = c[2] * f; }
   Q.writeBuffer(ubo, 0, UB);
 
   { let cr = floor((cz - OZ) / CELLW) | 0; cr = cr < 0 ? 0 : cr > CELLS - 1 ? CELLS - 1 : cr; let n = 0; rowOrd[n++] = cr; for (let d = 1; d < CELLS; d++) { if (cr - d >= 0) rowOrd[n++] = cr - d; if (cr + d < CELLS) rowOrd[n++] = cr + d; } }
@@ -359,6 +375,7 @@ function render() {
   r.setPipeline(pSolid); r.setVertexBuffer(0, vbMesh); r.setVertexBuffer(1, ibSolids); r.setIndexBuffer(ibMesh, 'uint32');
   drawSolids(r, false);
   r.setPipeline(pWin); r.setVertexBuffer(0, ibWin); r.draw(4, nWin);
+  r.setPipeline(pDec); r.setVertexBuffer(0, ibDecB); r.draw(4, nDec);
   // grass: 5-row blades up close, 3 rows further out
   const G = Wd.grass;
   r.setPipeline(pLeaf); r.setVertexBuffer(0, ibGrass); drawCells(r, G.start, G.lo, G.hi, 2, 10, 0, 16);
@@ -367,6 +384,7 @@ function render() {
   r.setPipeline(pBack); r.draw(4);
   r.setPipeline(pSt); r.setVertexBuffer(0, ibSteam); r.draw(4, nSteam);
   r.setPipeline(pSnow); r.setVertexBuffer(0, ibSnowB); r.draw(4, NSNOW);
+  r.setPipeline(pDrift); r.draw(4, NDRIFT);
   r.setPipeline(pGl); r.setVertexBuffer(0, ibGlare); r.draw(4, nGlare);
   r.end();
   // lamp light in the haze
@@ -385,24 +403,36 @@ function render() {
   if (slot) { slot.busy = true; slot.b.mapAsync(GPUMapMode.READ).then(slot.done); }
 }
 
-// ---------------------------------------------------------------- what moves on its own: wind, the bad lamp, the far road, the train
+// ---------------------------------------------------------------- what moves on its own: wind, the bad lamp, the highway, the trains, the plane
 // All of it is a function of the scene time, so the picture and the sound (audio.js reads the same numbers) agree.
-const ROADP = [113, 173, 241, 307], ROADO = [20, 95, 150, 60], TRAINP = 210, TRAIN0 = 38, TRAINV = 22;
+// The trains take turns on the track: a passenger train, then a freight train, each every TRAINP seconds.
+const TRAINP = 210, TRAIN0 = 38, TRAINV = 22, FREIGHTV = 13, PLANEP = 170, PLANET = 75;
 function world(dt) {
   const t = F[TIME];
   // wind: a slow swell with gusts riding on it, 0..1; the offset it has carried the air drives the snow
   let g = 0.5 + 0.5 * sin(t * 0.13 + 1.3 * sin(t * 0.071)); g = 0.16 + 0.84 * pow(g, 1.6) * (0.62 + 0.38 * sin(t * 0.83 + 2 * sin(t * 0.31)));
   F[GUST] = g; const ws = 0.8 + 4.2 * g; F[WX] += WDX * ws * dt; F[WZ] += WDZ * ws * dt;
   F[PAP] += (g > 0.4 ? g - 0.4 : 0) * 6 * dt;
+  // loose snow runs along the ground in the stronger gusts
+  F[DRF] += (g > 0.3 ? g - 0.3 : 0) * 9 * dt;
   // the failing lamp: stutters, and now and then goes out for a moment
   const n = fract(sin(floor(t * 13) * 91.7) * 43758.5), o = fract(t / 23 + 0.2) > 0.88;
   F[FLK] = o ? (fract(sin(floor(t * 7) * 33.1) * 9631.7) > 0.7 ? 0.9 : 0.04) : n > 0.86 ? 0.25 : 1;
-  for (let k = 0; k < 4; k++) {
-    const s = (t + ROADO[k]) % ROADP[k], v = 13 + k * 1.7, d = k & 1 ? -1 : 1;
-    F[RC + k * 3] = d * (s * v - 205); F[RC + k * 3 + 1] = d; F[RC + k * 3 + 2] = s * v < 410 ? 1 : 0;
+  // the highway: every slot sends a vehicle of its own kind now and then, at the kind's speed
+  for (let k = 0; k < NRC; k++) {
+    const q = t + ROADO[k], c = floor(q / ROADP[k]), h = ihash(k, c, 3), kind = vehKind(h), v = VEH[kind][1] * (0.9 + 0.2 * fract(h * 13.7)), x = (q - c * ROADP[k]) * v - 215 - VEH[kind][0];
+    F[RC + k * 4] = (k & 1 ? -1 : 1) * x; F[RC + k * 4 + 1] = k & 1 ? -1 : 1; F[RC + k * 4 + 2] = x < 215 + VEH[kind][0] ? 1 : 0; F[RC + k * 4 + 3] = kind;
   }
-  const q = t + TRAINP - TRAIN0, s = q % TRAINP, d = floor(q / TRAINP) & 1 ? -1 : 1;
-  F[TRD] = d; F[TRON] = s < 41.5 ? 1 : 0; F[TRX] = d > 0 ? -545 + TRAINV * s : 333 - TRAINV * s;
+  const q = t + TRAINP - TRAIN0, c = floor(q / TRAINP), s = q - c * TRAINP, d = floor(c / 2) & 1 ? -1 : 1;
+  if (c & 1) {
+    // freight: x is the nose of the locomotive, the cars trail behind it
+    F[TRON] = 0; F[TRX] = -1e4; F[FRD] = d; const x = -205 + FREIGHTV * s; F[FRON] = x - FRL < 205 ? 1 : 0; F[FRX] = d * x;
+  } else {
+    F[FRON] = 0; F[FRX] = -1e4; F[TRD] = d; F[TRON] = s < 41.5 ? 1 : 0; F[TRX] = d > 0 ? -545 + TRAINV * s : 333 - TRAINV * s;
+  }
+  // an aeroplane far overhead now and then, on a new heading every time
+  const pc = floor((t + 60) / PLANEP), ps = t + 60 - pc * PLANEP, ph = ihash(pc, 7, 11) * TAU, pd = (ps / PLANET - 0.5) * 16000, po = (ihash(pc, 5, 2) - 0.5) * 5000;
+  F[PLH] = ph; F[PLON] = ps < PLANET ? 1 : 0; F[PLX] = cos(ph) * pd - sin(ph) * po; F[PLZ] = sin(ph) * pd + cos(ph) * po;
 }
 
 // ---------------------------------------------------------------- collision

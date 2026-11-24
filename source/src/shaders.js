@@ -84,11 +84,12 @@ fn kar(c: vec3f) -> vec4f { let w = 1. / (1. + max(c.r, max(c.g, c.b))); return 
 
 // ---------------------------------------------------------------- shared scene code
 // G: view-projection, camera (w = time), camera basis, resolution, mis (exposure, haze strength, draw distance, gust),
-// wind (travelled offset, strength), pap (paper travel), tr (train x, direction, present), rc (cars on the far road:
-// x, direction, present), lamps (position + reach, colour + shadow tile or -1)
+// wind (travelled offset, strength), pap (paper travel, drifting snow travel), tr (passenger train x, direction, present),
+// tr2 (freight train x, direction, present), pl (aeroplane x, z, heading, present), rc (vehicles on the highway:
+// x, direction, present, kind), lamps (position + reach, colour + shadow tile or -1)
 const S_G = /*wgsl*/`
 struct Lamp { p: vec4f, c: vec4f };
-struct G { vp: mat4x4f, cam: vec4f, right: vec4f, up: vec4f, fwd: vec4f, res: vec4f, mis: vec4f, wind: vec4f, pap: vec4f, tr: vec4f, rc: array<vec4f, 4>, lamp: array<Lamp, ${NL}> };
+struct G { vp: mat4x4f, cam: vec4f, right: vec4f, up: vec4f, fwd: vec4f, res: vec4f, mis: vec4f, wind: vec4f, pap: vec4f, tr: vec4f, tr2: vec4f, pl: vec4f, rc: array<vec4f, ${NRC}>, lamp: array<Lamp, ${NL}> };
 const SIG = .0105;
 const FCOL = vec3f(.036, .027, .020);
 const WDIR = vec3f(${WDX}, 0., ${WDZ});
@@ -101,6 +102,7 @@ fn sat(x: f32) -> f32 { return clamp(x, 0., 1.); }
 fn ss(a: f32, b: f32, x: f32) -> f32 { let t = clamp((x - a) / (b - a), 0., 1.); return t * t * (3. - 2. * t); }
 fn ign(p: vec2f) -> f32 { return fract(52.9829189 * fract(dot(p, vec2f(.06711056, .00583715)))); }
 fn hs(x: f32) -> f32 { return fract(sin(x * 127.1) * 43758.5453); }
+fn h33(p: vec3f) -> vec3f { var q = fract(p * vec3f(.1031, .1030, .0973)); q += dot(q, q.yxz + 33.33); return fract((q.xxy + q.yxx) * q.zyx); }
 fn fin(c: vec3f) -> vec4f { return vec4f(min(max(c, vec3f(0.)), vec3f(60.)), 1.); }
 // the haze lit by the town, brightest towards the horizon
 fn fogc(rd: vec3f) -> vec3f { let h = 1. - abs(rd.y); return FCOL * (.45 + .75 * h * h * h); }
@@ -115,6 +117,7 @@ const S_B = S_G + /*wgsl*/`
 @group(0) @binding(5) var tD: texture_2d<f32>;
 @group(0) @binding(6) var tM: texture_2d<f32>;
 @group(0) @binding(7) var tL: texture_2d<u32>;
+@group(0) @binding(8) var tA: texture_2d<f32>;
 fn fog(c: vec3f, wp: vec3f) -> vec3f { let v = wp - g.cam.xyz; let d = length(v); let T = exp(-SIG * d); return c * T + fogc(v / d) * (1. - T); }
 fn qrot(q: vec4f, v: vec3f) -> vec3f { return v + 2. * cross(q.xyz, cross(q.xyz, v) + q.w * v); }
 // the viewer's room: lamp light gets in only through the window (d: vector to the lamp)
@@ -150,10 +153,11 @@ fn lit(p: vec3f, n: vec3f, V: vec3f, gl: f32) -> LT {
   for (var k = 0; k < 8; k++) {
     let id = lid(p, k); if (id > 100u) { break; }
     let L = g.lamp[id]; let d = L.p.xyz - p; let r2 = dot(d, d); let w = sat(1. - r2 / (L.p.w * L.p.w));
-    if (w <= 0.) { continue; }
+    // a light in the viewer's room (tag -2) lights only the room, the others get into it only through the window
+    if (w <= 0. || (L.c.w < -1.5 && !rm)) { continue; }
     let l = d * inverseSqrt(r2);
     var E = L.c.rgb * (w * w / (r2 + 1.) * lcone(L, l) * lsh4(L, p + n * .07));
-    if (rm) { E *= through(p, d); }
+    if (rm && L.c.w > -1.5) { E *= through(p, d); }
     let ndl = sat(dot(n, l));
     o.d += E * ndl;
     let h = normalize(l + V); let fr = .04 + .96 * pow(1. - sat(dot(h, V)), 5.);
@@ -188,7 +192,21 @@ struct VO { @builtin(position) cp: vec4f, @location(0) wp: vec3f, @location(1) n
     let a = (.07 + .3 * g.wind.w) * sin(t * 1.95 + i.c.y * 9.); let q = p.yz - vec2f(2.15, 0.);
     p = vec3f(p.x, 2.15 + q.x * cos(a) - q.y * sin(a), q.x * sin(a) + q.y * cos(a));
   }
-  var w = i.a.xyz + qrot(i.b, p);
+  if (an == 6 && live && p.y < .06 && p.z > 0.) {
+    // somebody sitting on a roof edge swings the legs over the drop, one after the other
+    let a = .22 * sin(t * 1.7 + i.c.y * 7. + sign(p.x) * 1.4) + .1; let q = p.yz - vec2f(.08, .05);
+    p = vec3f(p.x, .08 + q.x * cos(a) - q.y * sin(a), .05 + q.x * sin(a) + q.y * cos(a));
+  }
+  var w = i.a.xyz + qrot(i.b, p); var nw = qrot(i.b, i.n.xyz);
+  if (an == 4) {
+    // the freight train: laid out from its nose at x = 0 towards -x, turned round when it runs the other way
+    let d = g.tr2.y; w = vec3f(g.tr2.x + d * w.x, w.y - select(0., 60., g.tr2.z < .5), ${fl(RAILZ)} + d * (w.z - ${fl(RAILZ)})); nw = vec3f(d * nw.x, nw.y, d * nw.z);
+  }
+  if (an == 5) {
+    // a vehicle on the highway: its slot (seed) carries it, and only the kind the slot sends now (tex scale) is shown
+    let r = g.rc[u32(i.c.y + .5)]; let d = r.y;
+    w = vec3f(r.x + d * w.x, w.y - select(0., 60., r.z < .5 || abs(r.w - i.c.z) > .5), ${fl(ROADZ)} - 1.8 * d + d * w.z); nw = vec3f(d * nw.x, nw.y, d * nw.z);
+  }
   if (an == 1 && live) {
     // trees and wires: the shade bits are the sway weight, 0 at the trunk
     let ph = dot(i.a.xz, vec2f(.13, .09)) + i.c.y * 20.; let k = sh * sh; let gu = g.wind.w;
@@ -196,7 +214,7 @@ struct VO { @builtin(position) cp: vec4f, @location(0) wp: vec3f, @location(1) n
        + vec3f(sin(t * 3.7 + ph * 3. + w.y), .3 * cos(t * 4.3 + ph * 2. + w.x), cos(t * 3.1 + ph * 2.3 + w.y * 1.3)) * (k * sh * (.01 + .05 * gu));
   }
   if (an == 2) { w.x += g.tr.x; if (g.tr.z < .5) { w.y -= 60.; } }
-  o.cp = g.vp * vec4f(w, 1.); o.wp = w; o.n = qrot(i.b, i.n.xyz); o.op = i.p * i.a.w; o.on = i.n.xyz;
+  o.cp = g.vp * vec4f(w, 1.); o.wp = w; o.n = nw; o.op = i.p * i.a.w; o.on = i.n.xyz;
   o.m = i.c; o.mat = ai >> 3u; o.ao = select(sh, 1., an == 1);
   return o;
 }
@@ -282,7 +300,7 @@ fn pal(i: f32) -> vec3f {
     default { alb = vec3f(.04, .13, .06) * (.65 + .5 * wA.b); gl = .3; }
   }
   // thin, patchy November snow on whatever faces the sky
-  let sn = snowK * ss(.62, .9, n0.y) * ss(.47, .6, cov);
+  let sn = snowK * ss(.62, .9, n0.y) * ss(.47, .6, cov) * f32(!inroom(i.wp));
   alb = mix(alb, vec3f(.80, .83, .88) * (.8 + .25 * dC.b), sn); gl = mix(gl, .3, sn); bump = mix(bump, .25, sn);
   let tg = normalize(vec3f(n0.z, 0., 0. - n0.x) + vec3f(1e-4, 0., 0.));
   let pb = select((wB.rg - .5), (dC.rg - .5), flt) * bump;
@@ -299,8 +317,12 @@ fn pal(i: f32) -> vec3f {
 
 // ---------------------------------------------------------------- window panes: the frame, the glass, and a room behind it
 // One quad per pane. The room is not built: the view ray is followed into a box behind the glass and what it hits is
-// painted there (interior mapping), with wallpaper, furniture, curtains and a lamp chosen by the pane's seed.
-// Types: 0 window, 1 balcony glazing, 2 stairwell.
+// painted there (interior mapping). The pane's seed chooses the room: a living room (wallpaper, a carpet on the wall,
+// a wall unit with books, pictures, a television, a sofa or a table, people watching), a bedroom (a wardrobe, a bed)
+// or a kitchen (tiles, cupboards, a gas stove, a fridge, a table under oilcloth), then the lamp, curtains, plants and
+// a radio on the sill.
+// Types (low 2 bits): 0 window, 1 balcony glazing, 2 stairwell. Above them a flag set by world.js: 1 lit living room
+// with a radio, 2 lit kitchen where somebody cooks, 3 lit living room with people at the television.
 const W_WIN = S_B + /*wgsl*/`
 struct WI { @location(0) a: vec4f, @location(1) b: vec4f };
 struct WO { @builtin(position) cp: vec4f, @location(0) wp: vec3f, @location(1) uv: vec2f, @location(2) @interpolate(flat) nr: vec4f, @location(3) @interpolate(flat) sz: vec4f };
@@ -312,12 +334,46 @@ struct WO { @builtin(position) cp: vec4f, @location(0) wp: vec3f, @location(1) u
   return o;
 }
 fn hue(h: f32) -> vec3f { return .5 + .5 * cos(TAU * (h + vec3f(0., .33, .67))); }
+// 1 inside the rectangle of half size s around c
+fn rect(q: vec2f, c: vec2f, s: vec2f) -> f32 { let d = abs(q - c) - s; return step(max(d.x, d.y), 0.); }
+// wallpaper: stripes, little flowers, a lattice, checks, or plain paint with a band; x along the wall, v up
+fn paper(x: f32, v: f32, base: vec3f, k: f32, h: f32, pat: f32) -> vec3f {
+  var m = 0.;
+  if (k < .2) { m = step(.5, fract(x * (4. + 5. * h))); }
+  else if (k < .4) { let f = floor(x * 6.); let c = vec2f(fract(x * 6.) - .5, fract(v * 6. + .5 * f) - .5); m = step(length(c), .16) + .6 * step(abs(c.x), .03) * step(abs(c.y + .3), .15); }
+  else if (k < .6) { let c = abs(fract(vec2f(x * 3.5 + v * 2.5, x * 3.5 - v * 2.5)) - .5); m = step(.4, max(c.x, c.y)); }
+  else if (k < .8) { m = (step(.82, fract(x * 5.)) + step(.82, fract(v * 5.))) * .5; }
+  else { m = step(abs(v - 1.05), .05); }
+  return base * (1. - .25 * m * pat) + vec3f(.06, .05, .02) * (m * pat * step(.5, h));
+}
+// a framed picture around c0 with half size s: a landscape, a portrait or a still life
+fn picture(q0: vec2f, c0: vec2f, s: vec2f, h: f32) -> vec4f {
+  let q = q0 - c0; let e = s - abs(q); if (min(e.x, e.y) < 0.) { return vec4f(0.); }
+  if (min(e.x, e.y) < .04) { return vec4f(mix(vec3f(.22, .13, .05), vec3f(.42, .33, .12), step(.5, fract(h * 7.))), 1.); }
+  let u = (q + s) / (2. * s); var c = vec3f(0.);
+  if (h < .4) {
+    c = mix(mix(vec3f(.22, .30, .14), vec3f(.10, .18, .08), u.y * 1.5), mix(vec3f(.50, .60, .72), vec3f(.85, .72, .52), u.y), step(.45 + .06 * sin(u.x * 9. + h * 20.), u.y));
+    c = mix(c, vec3f(.95, .85, .55), step(length(u - vec2f(.74, .78)), .07));
+  } else if (h < .7) {
+    c = mix(vec3f(.30, .18, .10), vec3f(.08, .06, .05), u.y);
+    c = mix(c, vec3f(.70, .50, .38), step(length((u - vec2f(.5, .6)) / vec2f(.2, .27)), 1.));
+    c = mix(c, vec3f(.12, .10, .09), step(u.y, .32) * step(abs(u.x - .5), .36));
+  } else {
+    c = mix(vec3f(.14, .2, .28), vec3f(.08, .1, .13), u.y);
+    c = mix(c, vec3f(.4, .25, .1), step(length((u - vec2f(.5, .3)) / vec2f(.35, .12)), 1.));
+    c = mix(c, vec3f(.75, .15, .1), step(length(u - vec2f(.38, .42)), .13)); c = mix(c, vec3f(.85, .7, .2), step(length(u - vec2f(.6, .4)), .11));
+  }
+  return vec4f(c, 1.);
+}
+// the glow of a small light at point b seen along the ray from o in direction d, when it is in front of the hit at tm
+fn spot(o: vec3f, d: vec3f, b: vec3f, tm: f32, k: f32) -> f32 { let pl = b - o; let tl = max(dot(pl, d), 0.); let dq = length(pl - d * tl); return exp(-dq * dq * k) * f32(tl < tm); }
 @fragment fn fs(i: WO) -> @location(0) vec4f {
-  let n = vec3f(i.nr.x, 0., i.nr.y); let r = vec3f(i.nr.z, 0., i.nr.w); let sz = i.sz.xy; let sd = i.sz.z; let ty = i32(i.sz.w + .5);
+  let n = vec3f(i.nr.x, 0., i.nr.y); let r = vec3f(i.nr.z, 0., i.nr.w); let sz = i.sz.xy; let sd = i.sz.z; let tf = i32(i.sz.w + .5); let ty = tf & 3; let fl = tf >> 2u;
   let p = i.uv * sz * .5; let aa = max(fwidth(p.x), fwidth(p.y));
   let V0 = i.wp - g.cam.xyz; let dist = length(V0); let rw = V0 / dist; let t = g.cam.w;
   let dt = textureSample(tD, sR, i.wp.xy * .6 + i.wp.z * .37 + sd);
   let h1 = hs(sd * 91.3 + 1.7); let h2 = hs(sd * 37.7 + 5.1); let h3 = hs(sd * 13.3 + 9.9); let h4 = hs(sd * 57.1 + 3.3); let h5 = hs(sd * 23.9 + 4.4);
+  let h6 = hs(sd * 71.9 + 2.2); let h7 = hs(sd * 19.3 + 6.1); let h8 = hs(sd * 43.7 + 8.8);
   // --- frame: the outer one, then the bars of each type
   let e = sz * .5 - abs(p); var d = min(e.x, e.y) - .05;
   if (ty == 1) { let k = sz.x / max(round(sz.x / .62), 1.); d = min(d, abs(fract(p.x / k + .5) - .5) * k - .02); }
@@ -334,94 +390,184 @@ fn hue(h: f32) -> vec3f { return .5 + .5 * cos(TAU * (h + vec3f(0., .33, .67)));
   let tx = (select(x0, x1, rd.x > 0.) - p.x) / select(rd.x, 1e-5, abs(rd.x) < 1e-5);
   let tv_ = (select(y0, y1, rd.y > 0.) - p.y) / select(rd.y, 1e-5, abs(rd.y) < 1e-5);
   let tz = z1 / rd.z; let tm = min(tx, min(tv_, tz));
-  let h = vec3f(p, 0.) + rd * tm; let u = (h.x - x0) / (x1 - x0); let v = h.y - y0; let xm = (x0 + x1) * .5;
-  // --- is anyone home, and by what light
+  let h = vec3f(p, 0.) + rd * tm; let u = (h.x - x0) / (x1 - x0); let v = h.y - y0; let xm = (x0 + x1) * .5; let o = vec3f(p, 0.);
+  // --- is anyone home, what room it is, and by what light
   var on = step(h1, .075);
   on = mix(on, step(.6, hs(floor(t / (50. + 90. * h3) + h4) + sd * 7.)), step(.93, hs(sd * 71.7)));
   if (ty == 2) { on = step(.1, h1); }
   if (ty == 1) { on = step(h1, .05); }
+  if (fl > 0) { on = 1.; }
+  var kd = select(select(0, 1, h6 > .82), 2, h6 < .27);
+  if (fl == 2) { kd = 2; } else if (fl > 0) { kd = 0; }
   var lc = vec3f(1., .60, .28) * 5.;
   if (h3 > .5) { lc = vec3f(1., .78, .50) * 5.; }
   if (h3 > .8) { lc = vec3f(.8, .95, 1.1) * 4.5; }
-  if (h3 < .14) { lc = vec3f(1., .22, .55) * 3.2; }
-  let tv = f32(h3 >= .14 && h3 < .3 && ty == 0);
+  if (h3 < .14 && kd != 2) { lc = vec3f(1., .22, .55) * 3.2; }
+  if (kd == 2) { lc = select(vec3f(1., .82, .55) * 3.4, vec3f(.85, 1., .95) * 3., h7 > .55); }
+  var tv = f32(h3 >= .14 && h3 < .34 && ty == 0 && kd == 0);
+  if (fl == 3) { tv = 1.; } else if (fl == 1) { tv = 0.; }
   let tt = t * 4. + sd * 50.; let flick = .5 + .5 * mix(hs(floor(tt)), hs(floor(tt) + 1.), fract(tt));
   lc = mix(lc, vec3f(.25, .42, 1.) * (1.3 * flick + .3), tv);
   if (ty == 2) { lc = vec3f(.80, .85, .50) * 1.2; }
-  // --- what the ray hits
-  let wc = .22 + .2 * hue(h4) + .12; let pat = sat(1. - aa * 10.);
-  var alb = vec3f(.3); var scr = 0.;
-  if (tm == tz) {
-    alb = wc * (1. - .14 * pat * step(.5, fract(h.x * (5. + 6. * h2))));
-    if (ty == 0) {
-      if (h2 > .62) {
-        // a carpet on the wall
-        let cq = vec2f(h.x - xm, v - 1.6); let inC = step(abs(cq.x), .95) * step(abs(cq.y), .65);
-        let orn = (.5 + .5 * cos(cq.x * 13.) * cos(cq.y * 13.)) * pat; let bor = step(.8, max(abs(cq.x) / .95, abs(cq.y) / .65));
-        alb = mix(alb, mix(vec3f(.36, .05, .04), vec3f(.50, .36, .16), orn * .6 + bor * .3), inC);
-      } else if (h2 < .34) {
-        // the wall unit: dark doors, books behind glass in the middle
-        let inU = step(v, 2.05) * step(.1, u) * step(u, .9); let cx = fract(u * 5.);
-        var uc = vec3f(.16, .08, .04) * (.55 + .45 * ss(.0, .05, min(cx, 1. - cx)));
-        let bk = hs(floor(h.x * 28.) + floor(v * 3.) * 7.);
-        uc = mix(uc, hue(bk) * (.12 + .5 * step(.14, fract(v * 3.))) * (.4 + .6 * pat), step(.4, u) * step(u, .6) * step(.7, v));
-        alb = mix(alb, uc, inU);
+  // the gas is on in the kitchens now and then (always where somebody cooks), a radio plays in some rooms
+  let gas = f32(kd == 2 && ty == 0) * max(f32(fl == 2), step(.5, hs(floor(t / 41. + h4) + sd * 3.)));
+  let rad = f32(ty == 0) * max(f32(fl == 1), step(.86, h8) * f32(kd != 1));
+  let pat = sat(1. - aa * 10.); let wc = .2 + .22 * hue(h4) + .12;
+  var c = vec3f(0.); var em = vec3f(0.); var scr = 0.;
+  if (on > .5 || ty == 1) {
+    // --- what the ray hits
+    var alb = vec3f(.3);
+    let lp = vec3f(xm, y1 - select(.45, .65, kd == 2), z1 * .5); let tp = vec3f(mix(x0, x1, .72), y0 + .95, z1 - .2);
+    let sx = mix(x0, x1, select(.22, .7, h5 > .5)); // the stove
+    if (tm == tz) {
+      alb = paper(h.x, v, wc, h7, h2, pat);
+      if (ty == 0 && kd == 0) {
+        if (h2 > .62) {
+          // a carpet on the wall
+          let cq = vec2f(h.x - xm, v - 1.6); let inC = step(abs(cq.x), .95) * step(abs(cq.y), .65);
+          let orn = (.5 + .5 * cos(cq.x * 13.) * cos(cq.y * 13.)) * pat; let bor = step(.8, max(abs(cq.x) / .95, abs(cq.y) / .65));
+          alb = mix(alb, mix(vec3f(.36, .05, .04), vec3f(.50, .36, .16), orn * .6 + bor * .3), inC);
+        } else if (h2 < .34) {
+          // the wall unit: dark doors, glass in the middle with books and the good china
+          let inU = step(v, 2.05) * step(.1, u) * step(u, .9); let cx = fract(u * 5.);
+          var uc = vec3f(.16, .08, .04) * (.55 + .45 * ss(.0, .05, min(cx, 1. - cx)));
+          let bk = hs(floor(h.x * 28.) + floor(v * 3.) * 7.);
+          uc = mix(uc, hue(bk) * (.12 + .5 * step(.14, fract(v * 3.))) * (.4 + .6 * pat), step(.4, u) * step(u, .6) * step(.7, v));
+          uc = mix(uc, vec3f(.6, .58, .55) * step(.5, fract(h.x * 9.)) * step(.2, fract(v * 3.)), step(.2, u) * step(u, .38) * step(1.2, v));
+          alb = mix(alb, uc, inU);
+        } else {
+          // pictures: a big one, and a smaller one beside it
+          let pc = picture(vec2f(h.x, v), vec2f(mix(x0, x1, .3 + .4 * h1), 1.65), vec2f(.34, .25), h5);
+          let pc2 = picture(vec2f(h.x, v), vec2f(mix(x0, x1, .3 + .4 * h1) + select(-.62, .62, h1 < .5), 1.75), vec2f(.14, .19), fract(h5 * 7.3));
+          alb = mix(alb, pc.rgb, pc.a); alb = mix(alb, pc2.rgb, pc2.a);
+        }
+        // a clock
+        let kq = vec2f(h.x - mix(x0, x1, .15 + .7 * h7), v - 2.1); alb = mix(alb, mix(vec3f(.7, .68, .6), vec3f(.05), step(abs(length(kq) - .1), .012)), step(length(kq), .11) * step(.5, h8));
+        // the television on a low cabinet, a radio beside it
+        let tq = vec2f(h.x - tp.x, v - .95);
+        scr = rect(tq, vec2f(0.), vec2f(.42, .25)) * tv;
+        alb = mix(alb, vec3f(.05, .04, .035), rect(tq, vec2f(0.), vec2f(.46, .29)) * (1. - scr) * step(.14, h3) * step(h3, .34));
+        alb = mix(alb, vec3f(.14, .08, .04), rect(tq, vec2f(0., -.48), vec2f(.6, .2)));
+        if (rad > .5) { alb = mix(alb, vec3f(.25, .14, .07), rect(tq, vec2f(-.42, -.18), vec2f(.17, .1))); em += vec3f(1., .55, .2) * rect(tq, vec2f(-.42, -.16), vec2f(.12, .025)) * .6; }
+      } else if (ty == 0 && kd == 1) {
+        // the bedroom: a tall wardrobe with a mirror, a picture over the bed
+        let wq = vec2f(h.x - mix(x0, x1, select(.18, .82, h4 > .5)), v);
+        alb = mix(alb, mix(vec3f(.2, .11, .05), vec3f(.35, .38, .4) * (.7 + .3 * sin(h.x * 30.)), rect(wq, vec2f(0., 1.1), vec2f(.12, .75))) * (.8 + .2 * step(.02, abs(wq.x))), rect(wq, vec2f(0., 1.), vec2f(.5, 1.)));
+        let pc = picture(vec2f(h.x, v), vec2f(mix(x0, x1, select(.65, .35, h4 > .5)), 1.55), vec2f(.4, .26), h5); alb = mix(alb, pc.rgb, pc.a);
+      } else if (ty == 0) {
+        // the kitchen: tiles to shoulder height, wall cupboards, the stove, a worktop with doors under it, the fridge
+        let tq = fract(vec2f(h.x, v) / .15); let tile = select(select(vec3f(.62, .64, .60), vec3f(.45, .58, .62), h7 > .4), vec3f(.48, .58, .44), h7 > .75);
+        alb = mix(alb, tile * (1. - .45 * pat * f32(min(tq.x, tq.y) < .07)), step(v, 1.45));
+        let cab = rect(vec2f(h.x, v), vec2f(mix(x0, x1, .4), 1.95), vec2f((x1 - x0) * .32, .32));
+        alb = mix(alb, mix(vec3f(.55, .5, .42), vec3f(.35, .3, .25), step(abs(fract((h.x - x0) * 2.) - .5), .01)) * select(1., .7, h5 > .5), cab);
+        alb = mix(alb, vec3f(.45, .42, .36) * (1. - .4 * step(abs(fract((h.x - x0) * 2.) - .5), .01)), step(v, .85) * (1. - rect(vec2f(h.x, v), vec2f(sx, .42), vec2f(.27, .43))));
+        alb = mix(alb, vec3f(.3, .28, .25), step(abs(v - .86), .02));
+        let st = rect(vec2f(h.x, v), vec2f(sx, .43), vec2f(.26, .43)); alb = mix(alb, mix(vec3f(.75, .74, .7), vec3f(.06), rect(vec2f(h.x, v), vec2f(sx, .4), vec2f(.18, .14))), st);
+        let fr = vec2f(h.x - mix(x0, x1, select(.9, .1, h5 > .5)), v);
+        alb = mix(alb, vec3f(.78, .78, .74) * (1. - .5 * step(abs(fr.y - 1.15), .01)), rect(fr, vec2f(0., .85), vec2f(.3, .85)) * step(length(max(abs(fr - vec2f(0., .85)) - vec2f(.24, .79), vec2f(0.))), .06));
+        // the wired radio on the wall and a calendar
+        alb = mix(alb, vec3f(.5, .45, .38), rect(vec2f(h.x, v), vec2f(mix(x0, x1, .82), 1.7), vec2f(.1, .07)) * step(.4, h8));
+        alb = mix(alb, mix(vec3f(.85, .83, .8), vec3f(.6, .1, .1), step(1.58, v)), rect(vec2f(h.x, v), vec2f(mix(x0, x1, .12), 1.5), vec2f(.14, .2)));
+        // a kettle on the stove
+        let kq = vec2f(h.x - sx - .08, v - .98);
+        alb = mix(alb, select(vec3f(.6, .1, .08), vec3f(.55, .55, .55), h4 > .5), sat(step(length(kq / vec2f(.11, .1)), 1.) + step(abs(kq.x + .12), .025) * step(abs(kq.y - .02), .04)));
+      } else if (ty == 2) {
+        // stairwell: paint to shoulder height, whitewash above, the flight going up
+        alb = mix(vec3f(.50, .50, .44), vec3f(.09, .21, .15), step(v, 1.6));
+        alb = mix(alb, vec3f(.07), step(v, .25 + u * 1.5) * step(.12, fract((v - u * 1.5) * 4. + .5)) * .8);
       } else {
-        let cq = vec2f(h.x - mix(x0, x1, .3 + .4 * h1), v - 1.65); let inP = step(abs(cq.x), .32) * step(abs(cq.y), .24);
-        alb = mix(alb, mix(vec3f(.08, .05, .03), .12 + .25 * hue(h1 + cq.y), step(abs(cq.x), .28) * step(abs(cq.y), .2)), inP);
+        // behind the balcony glass: the house wall with the door of the flat
+        let dq = vec2f(h.x + .1, v - 1.1); let door = step(abs(dq.x), .55) * step(abs(dq.y), 1.05);
+        alb = mix(vec3f(.2, .18, .15), vec3f(.02), door); scr = door;
       }
-      let tq = vec2f(h.x - mix(x0, x1, .72), v - .95);
-      scr = step(abs(tq.x), .42) * step(abs(tq.y), .25) * tv;
-    } else if (ty == 2) {
-      // stairwell: paint to shoulder height, whitewash above, the flight going up
-      alb = mix(vec3f(.50, .50, .44), vec3f(.09, .21, .15), step(v, 1.6));
-      alb = mix(alb, vec3f(.07), step(v, .25 + u * 1.5) * step(.12, fract((v - u * 1.5) * 4. + .5)) * .8);
-    } else {
-      // behind the balcony glass: the house wall with the door of the flat
-      let dq = vec2f(h.x + .1, v - 1.1); let door = step(abs(dq.x), .55) * step(abs(dq.y), 1.05);
-      alb = mix(vec3f(.2, .18, .15), vec3f(.02), door); scr = door;
+    } else if (tm == tx) {
+      alb = paper(h.z, v, wc, h7, h2, pat) * .85;
+      if (ty == 2) { alb = mix(vec3f(.46, .46, .40), vec3f(.08, .19, .14), step(v, 1.6)); }
+      if (ty == 0) {
+        if (kd == 2) { alb = mix(alb, vec3f(.6, .62, .58) * (1. - .4 * pat * f32(min(fract(h.z / .15), fract(v / .15)) < .07)), step(v, 1.45)); }
+        else if (rd.x * (h4 - .5) > 0.) {
+          // a bookcase or a wardrobe along the wall
+          let inS = step(v, 2.1) * step(.3 * z1, h.z) * step(h.z, .85 * z1);
+          var sc = vec3f(.13, .07, .04) * (.6 + .4 * step(.04, abs(fract(h.z * 1.6) - .5)));
+          if (kd == 0 && h7 > .35) { let row = fract(v * 2.8); let bk = hs(floor(h.z * 30.) + floor(v * 2.8) * 13. + sd); sc = mix(vec3f(.12, .07, .04), hue(bk) * (.2 + .25 * bk) * (.5 + .5 * pat), step(.12, row) * step(row, .85) * step(.15, fract(h.z * 30.))); }
+          alb = mix(alb, sc, inS);
+        } else {
+          let pc = picture(vec2f(h.z, v), vec2f(z1 * .55, 1.6), vec2f(.3, .22), fract(h5 * 3.1)); alb = mix(alb, pc.rgb, pc.a);
+          alb = mix(alb, vec3f(.07, .04, .03), rect(vec2f(h.z, v), vec2f(z1 * .85, 1.), vec2f(.4, 1.)) * step(.6, h8)); // the door to the hall
+        }
+      }
+    } else if (rd.y > 0.) { alb = vec3f(.60, .58, .54); }
+    else {
+      // the floor: parquet or linoleum, a rug
+      alb = select(vec3f(.22, .13, .07) * (.8 + .3 * step(.5, fract(h.x * 4. + step(.5, fract(h.z * 2.)) * .5))), mix(vec3f(.3, .26, .2), vec3f(.18, .15, .12), step(.5, fract(floor(h.x * 3.) * .5 + floor(h.z * 3.) * .5))), kd == 2);
+      let rq = (h.xz - vec2f(xm, z1 * .55)) / vec2f(1.2, .9);
+      let rug = select(step(length(rq), 1.), step(max(abs(rq.x), abs(rq.y)), .9), h7 > .5) * step(.5, h4) * f32(kd != 2);
+      alb = mix(alb, (.1 + .25 * hue(h1 + .4)) * (.7 + .3 * cos(length(rq) * 20. * pat)), rug);
     }
-  } else if (tm == tx) {
-    alb = wc * .82;
-    if (ty == 2) { alb = mix(vec3f(.46, .46, .40), vec3f(.08, .19, .14), step(v, 1.6)); }
-    if (ty == 0 && rd.x * (h4 - .5) > 0.) { alb = mix(alb, vec3f(.13, .07, .04) * (.6 + .4 * step(.04, abs(fract(h.z * 1.6) - .5))), step(v, 2.1) * step(.3 * z1, h.z) * step(h.z, .85 * z1)); }
-  } else if (rd.y > 0.) { alb = vec3f(.60, .58, .54); }
-  else { alb = mix(vec3f(.20, .12, .07), .1 + .25 * hue(h1 + .4), step(length((h.xz - vec2f(xm, z1 * .55)) / vec2f(1.2, .9)), 1.) * step(.5, h4)); }
-  // --- light in the room: from the lamp under the ceiling, or from the screen
-  let lp = vec3f(xm, y1 - .45, z1 * .5); let tp = vec3f(mix(x0, x1, .72), y0 + .95, z1 - .2);
-  let I = mix(1.3 / (.7 + dot(h - lp, h - lp)), .8 / (.5 + dot(h - tp, h - tp)), tv);
-  var c = alb * lc * I * on;
-  if (ty == 1) { c = alb * (Lo.d * .25 + FCOL) + lc * scr * on * .5; } else { c += vec3f(.4, .6, 1.) * (scr * on * 3. * (.4 + flick)); }
-  if (ty != 1) {
-    // furniture standing in the room: a sofa or a table with chairs
-    let zc = z1 * .55; let tc = zc / rd.z;
-    if (tc < tm && ty == 0) {
-      let cp = vec3f(p + rd.xy * tc, zc); let q = vec2f(cp.x - mix(x0, x1, .35 + .3 * h1), cp.y - y0); var mk = 0.;
-      if (h4 < .5) { mk = step(abs(q.x), .95) * step(q.y, .82) * step(.08, q.y) + step(abs(abs(q.x) - .9), .1) * step(q.y, .62); }
-      else { mk = step(abs(q.x), .62) * step(abs(q.y - .74), .03) + step(abs(abs(q.x) - .52), .03) * step(q.y, .74) + step(abs(q.x - .9), .035) * step(q.y, .98) + step(abs(q.x - .74), .2) * step(abs(q.y - .46), .03); }
-      let fc_ = mix(.06 + .16 * hue(h2 + .2), vec3f(.10, .06, .035), step(.5, h4));
-      c = mix(c, fc_ * lc * (mix(1.3 / (.7 + dot(cp - lp, cp - lp)), .3, tv) * on), sat(mk));
-    }
-    // the lamp itself
-    let pl = lp - vec3f(p, 0.); let tl = max(dot(pl, rd), 0.); let dq = length(pl - rd * tl);
-    c += lc * ((exp(-dq * dq * 70.) * 2.6 + exp(-dq * dq * 8.) * .3) * on * (1. - tv) * f32(tl < tm));
-    // somebody stands at the window and looks out
-    if (ty == 0 && hs(sd * 3.3) > .88) {
-      let k = .45 / rd.z; let q = vec2f(p.x + rd.x * k - sz.x * (h2 - .5) * .5 - .02 * sin(t * .31 + sd * 9.), p.y + rd.y * k + sz.y * .5 - .68);
-      let body = max(step(length(q), .105), step(abs(q.x), .25 - .12 * sat((q.y + .34) / .16)) * step(q.y, -.13));
-      c = mix(c, c * .03, body * step(.5, on));
+    // --- light in the room: from the lamp under the ceiling, or from the screen
+    let I = mix(1.3 / (.7 + dot(h - lp, h - lp)), .8 / (.5 + dot(h - tp, h - tp)), tv);
+    c = alb * lc * I * on + em;
+    if (ty == 1) { c = alb * (Lo.d * .25 + FCOL) + lc * scr * on * .5; } else { c += vec3f(.4, .6, 1.) * (scr * on * 3. * (.4 + flick)); }
+    if (ty == 0) {
+      // the blue flames of the gas, and their light on the wall behind
+      let fk = .75 + .25 * sin(t * 37. + sd * 9.) * sin(t * 23.);
+      for (var b = 0; b < 2; b++) { let bp = vec3f(sx + select(-.12, .12, b == 1), y0 + .9, z1 - .25); c += vec3f(.25, .45, 1.4) * ((spot(o, rd, bp, tm, 3000.) * 2.5 + spot(o, rd, bp, tm, 200.) * .25) * gas * fk); }
+      let gq = h - vec3f(sx, y0 + 1., z1); c += vec3f(.1, .2, .6) * (gas * .5 / (.2 + dot(gq, gq)) * f32(tm == tz));
+      // furniture standing in the room
+      let zc = z1 * .55; let tc = zc / rd.z;
+      if (tc < tm) {
+        let cp = vec3f(p + rd.xy * tc, zc); let q = vec2f(cp.x - mix(x0, x1, .35 + .3 * h1), cp.y - y0); var mk = 0.; var hd = 0.;
+        var fc_ = mix(.06 + .16 * hue(h2 + .2), vec3f(.10, .06, .035), step(.5, h4));
+        if (kd == 1) {
+          // a bed with its headboard
+          mk = rect(q, vec2f(0., .28), vec2f(1., .2)) + rect(q, vec2f(-1., .5), vec2f(.06, .45)); fc_ = .08 + .2 * hue(h5 + .1);
+        } else if (kd == 2) {
+          // the kitchen table under its oilcloth, a stool, and somebody sitting at it
+          mk = rect(q, vec2f(0., .68), vec2f(.58, .07)) + step(abs(abs(q.x) - .45), .025) * step(q.y, .74) + rect(q, vec2f(.75, .22), vec2f(.16, .22)) + rect(q, vec2f(.75, .44), vec2f(.18, .02));
+          fc_ = select(vec3f(.5, .1, .1), vec3f(.15, .3, .5), h7 > .5) * (.6 + .4 * step(.5, fract(q.x * 6.)));
+          hd = (step(length((q - vec2f(-.85, 1.18)) / vec2f(.11, .13)), 1.) + rect(q, vec2f(-.85, .8), vec2f(.2, .27))) * step(.55, h8);
+        } else if (h4 < .5 || tv > .5) {
+          // a sofa seen from behind, and the heads of whoever watches the television
+          mk = rect(q, vec2f(0., .45), vec2f(.95, .37)) + rect(q, vec2f(0., .3), vec2f(1.05, .22));
+          if (tv > .5) { hd = step(length((q - vec2f(-.35, 1.)) / vec2f(.11, .13)), 1.) + rect(q, vec2f(-.35, .84), vec2f(.2, .08)) + (step(length((q - vec2f(.3, .97)) / vec2f(.1, .12)), 1.) + rect(q, vec2f(.3, .82), vec2f(.18, .08))) * step(.4, h8); }
+        } else {
+          // a table with chairs, maybe an armchair
+          mk = step(abs(q.x), .62) * step(abs(q.y - .74), .03) + step(abs(abs(q.x) - .52), .03) * step(q.y, .74) + step(abs(q.x - .9), .035) * step(q.y, .98) + step(abs(q.x - .74), .2) * step(abs(q.y - .46), .03);
+          mk += rect(q, vec2f(-1.25, .42), vec2f(.3, .3)) * step(.7, h7);
+        }
+        let fi = mix(1.3 / (.7 + dot(cp - lp, cp - lp)), .45, tv);
+        c = mix(c, fc_ * lc * (fi * on), sat(mk));
+        c = mix(c, lc * .004, sat(hd) * on);
+      }
+      // the lamp itself, or the shade over the kitchen table
+      let tl = max(dot(lp - o, rd), 0.); let dq = length(lp - o - rd * tl);
+      c += lc * ((exp(-dq * dq * 70.) * 2.6 + exp(-dq * dq * 8.) * .3) * on * (1. - tv) * f32(tl < tm));
+      // somebody stands at the window and looks out
+      if (hs(sd * 3.3) > .88) {
+        let k = .45 / rd.z; let q = vec2f(p.x + rd.x * k - sz.x * (h2 - .5) * .5 - .02 * sin(t * .31 + sd * 9.), p.y + rd.y * k + sz.y * .5 - .68);
+        let body = max(step(length(q), .105), step(abs(q.x), .25 - .12 * sat((q.y + .34) / .16)) * step(q.y, -.13));
+        c = mix(c, c * .03, body * step(.5, on));
+      }
     }
   }
   if (ty == 0) {
-    // a plant on the sill
-    let k = .15 / rd.z; let q = vec2f(p.x + rd.x * k - sz.x * (.3 - .6 * h4), p.y + rd.y * k + sz.y * .5);
-    let pm = max(step(abs(q.x), .07) * step(q.y, .12), step(length(q - vec2f(0., .26)), .12 + .035 * sin(atan2(q.y - .26, q.x) * 5. + sd * 9.)));
-    c = mix(c, vec3f(.02, .045, .02) * (lc * on * .12 + Lo.d * .3 + FCOL), pm * step(.55, hs(sd * 5.5)));
-    // curtains: none, net, net and drapes, drapes drawn
+    // things on the sill: a plant (a bush, a cactus or violets) and maybe a radio with its dial lit
+    let k = .15 / rd.z; let sq = vec2f(p.x + rd.x * k, p.y + rd.y * k + sz.y * .5);
+    let q = sq - vec2f(sz.x * (.3 - .6 * h4), 0.); let pk = hs(sd * 8.1); var pm = 0.; var pc = vec3f(.02, .045, .02);
+    if (pk < .45) { pm = max(step(abs(q.x), .07) * step(q.y, .12), step(length(q - vec2f(0., .26)), .12 + .035 * sin(atan2(q.y - .26, q.x) * 5. + sd * 9.))); }
+    else if (pk < .7) { pm = max(step(abs(q.x), .06) * step(q.y, .1), step(length((q - vec2f(0., .22)) / vec2f(.045, .14)), 1.) + step(length((q - vec2f(.06, .25)) / vec2f(.025, .06)), 1.)); }
+    else { for (var j = 0; j < 3; j++) { let qq = q - vec2f(f32(j - 1) * .14, 0.); pm = max(pm, step(abs(qq.x), .045) * step(qq.y, .08) + step(length(qq - vec2f(0., .11)), .055)); pc = mix(pc, vec3f(.25, .06, .3), step(length(qq - vec2f(.02, .14)), .025)); } }
+    let lt = lc * on * .12 + Lo.d * .3 + FCOL;
+    c = mix(c, pc * lt * 2., sat(pm) * step(.45, hs(sd * 5.5)));
+    if (rad > .5) {
+      let rq = sq - vec2f(sz.x * (.3 - .6 * (1. - h4)), .07);
+      c = mix(c, vec3f(.12, .06, .03) * lt * 3. + vec3f(1., .5, .15) * (rect(rq, vec2f(0., .02), vec2f(.08, .015)) * 1.2), rect(rq, vec2f(0.), vec2f(.13, .07)));
+    }
+    // curtains: none, net, net and drapes, drapes drawn; a short cafe curtain in kitchens
     let fold = mix(.5, .5 + .5 * sin(p.x * (34. + 20. * h2) + 2. * sin(p.y * 2.3 + h1 * 9.)), sat(1. - aa * 30.));
     let cv = select(select(0., .2 + .45 * h4, h5 > .6), 1., h5 > .85);
-    let dr = step(sz.x * .5 * (1. - cv), abs(p.x) + 1e-4) * f32(cv > 0.);
-    let net = f32(h5 > .25) * (.36 + .26 * fold) * (1. - dr);
+    let dr = step(sz.x * .5 * (1. - cv), abs(p.x) + 1e-4) * f32(cv > 0.) * f32(kd != 2);
+    let net = f32(h5 > .25) * (.36 + .26 * fold) * (1. - dr) * select(1., step(p.y, -.05), kd == 2);
     c = mix(c, vec3f(.8) * (lc * .22 * on * (1. - tv * .6) + Lo.d * .3 + FCOL * .7), net);
     c = mix(c, (.18 + .4 * hue(h1 + .3)) * (.55 + .45 * fold) * (lc * .2 * on + Lo.d * .25 + FCOL * .5), dr);
   }
@@ -431,6 +577,35 @@ fn hue(h: f32) -> vec3f { return .5 + .5 * cos(TAU * (h + vec3f(0., .33, .67)));
   let fa = select(vec3f(.40, .40, .38), vec3f(.10, .06, .04), h4 > .7 && ty == 0) * (.7 + .4 * dt.b);
   c = mix(c, fa * (Lo.d + FCOL * .9), fm);
   return fin(fog(c, i.wp));
+}
+`;
+
+// ---------------------------------------------------------------- decals: paint and print on walls, signs that glow
+// One quad per decal, its picture a cell of the atlas (atlas.js). Modes: 0 paint lit by the lamps, 1 glowing, 2 neon that
+// stutters now and then.
+const W_DEC = S_B + /*wgsl*/`
+struct DI { @location(0) a: vec4f, @location(1) b: vec4f, @location(2) c: vec4f };
+struct DO { @builtin(position) cp: vec4f, @location(0) wp: vec3f, @location(1) uv: vec2f, @location(2) @interpolate(flat) n: vec4f };
+@vertex fn vs(@builtin(vertex_index) vi: u32, i: DI) -> DO {
+  var o: DO; let q = vec2f(f32(vi & 1u), f32(vi >> 1u)) * 2. - 1.;
+  let n = vec2f(sin(i.a.w), cos(i.a.w)); let r = vec2f(n.y, 0. - n.x);
+  let w = i.a.xyz + vec3f(r.x, 0., r.y) * (q.x * i.b.x * .5) + vec3f(0., q.y * i.b.y * .5, 0.);
+  o.cp = g.vp * vec4f(w, 1.); o.wp = w; o.uv = mix(i.c.xy, i.c.zw, vec2f(q.x * .5 + .5, .5 - q.y * .5)); o.n = vec4f(n, i.b.zw);
+  return o;
+}
+@fragment fn fs(i: DO) -> @location(0) vec4f {
+  let s = textureSample(tA, sR, i.uv); if (s.a < .004) { discard; }
+  let a0 = s.rgb / s.a; let alb = a0 * a0; let n = vec3f(i.n.x, 0., i.n.y); let V = normalize(g.cam.xyz - i.wp); let md = i32(i.n.z + .5);
+  var c = vec3f(0.);
+  if (md == 0) { let L = lit(i.wp, n, V, .25); c = alb * .75 * (L.d + FCOL * 1.2) + L.s * .2; }
+  else {
+    var f = 1.;
+    if (md == 2) { let t = g.cam.w; let sd = i.wp.x * .37 + i.wp.z * .11; f = select(1., .12 + .3 * hs(floor(t * 23.)), fract(t / 13. + sd) > .93 && hs(floor(t * 11.) + sd) > .4); }
+    // a television: the picture breathes with the scene, scan lines across it
+    if (md == 3) { let t = g.cam.w; f = (.55 + .45 * hs(floor(t * 3.))) * (.85 + .15 * sin(i.uv.y * 3000.)) * (.9 + .1 * hs(floor(t * 25.))); }
+    c = alb * (i.n.w * f);
+  }
+  return vec4f(fog(c, i.wp) * s.a, s.a);
 }
 `;
 
@@ -469,20 +644,52 @@ struct LO { @builtin(position) cp: vec4f, @location(0) wp: vec3f, @location(1) c
 
 // ---------------------------------------------------------------- sky, snow, glare, paper, steam
 const W_SPR = S_B + /*wgsl*/`
+const VEHL = array<f32, ${VEH.length}>(${VEH.map((v) => fl(v[0])).join(', ')});
 struct VO { @builtin(position) cp: vec4f, @location(0) uv: vec2f, @location(1) @interpolate(flat) pr: vec4f, @location(2) wp: vec3f };
 fn quad(i: u32) -> vec2f { return vec2f(f32(i & 1u), f32(i >> 1u)) * 2. - 1.; }
-// behind everything: the glowing haze, with slow low cloud overhead
+// behind everything: the sky (fsB below)
 @vertex fn vsB(@builtin(vertex_index) i: u32) -> VO {
   var o: VO; let p = quad(i);
   o.wp = g.cam.xyz + g.fwd.xyz + g.right.xyz * (p.x * g.right.w) + g.up.xyz * (p.y * g.up.w);
   o.cp = vec4f(p, 1e-7, 1.); o.uv = p; o.pr = vec4f(0.);
   return o;
 }
+// the night sky over the haze: a deck of cloud drifting on the wind and lit from below by the town, stars and the moon
+// in its gaps, now and then an aeroplane's lights; towards the horizon all of it sinks into the haze
+const MOON = vec3f(-.22, .27, -.94);
+fn plight(rd: vec3f, p: vec3f, px: f32) -> f32 { let v = normalize(p - g.cam.xyz); let a = length(cross(rd, v)); return exp(-a * a / (px * px)) * step(0., dot(rd, v)); }
 @fragment fn fsB(i: VO) -> @location(0) vec4f {
-  let rd = normalize(i.wp - g.cam.xyz);
-  let q = rd.xz / (abs(rd.y) + .25) * .09 + g.wind.xz * .0006;
-  let cl = textureSampleLevel(tD, sR, q, 0.).a * .6 + textureSampleLevel(tD, sR, q * 2.3 + .4, 0.).b * .4;
-  return fin(fogc(rd) * (1. + (cl - .5) * .5 * ss(.0, .35, rd.y)));
+  let rd = normalize(i.wp - g.cam.xyz); let t = g.cam.w; let up = max(rd.y, 0.);
+  let px = g.up.w * 2.4 / g.res.y;
+  // the cloud deck: a plane far up, so it slides past slowly and shrinks towards the horizon
+  let q = rd.xz / (up + .1) * .11 + vec2f(t * .0042, t * .0027) + g.wind.xz * .00015;
+  let n = textureSampleLevel(tD, sR, q, 0.).a * .64 + textureSampleLevel(tD, sR, q * 2.7 + .3, 0.).a * .36 + (textureSampleLevel(tD, sR, q * 8.3 + .7, 0.).a - .5) * .16;
+  let cov = ss(.43, .54, n); let thick = ss(.5, .66, n);
+  let M = normalize(MOON); let ma = acos(clamp(dot(rd, M), -1., 1.));
+  // clear patches: deep blue-black with stars, faint where the haze still is
+  var sky = vec3f(.0026, .0034, .0062);
+  let sp = rd * 230.; let ci = floor(sp); let hh = h33(ci); let dd = length(sp - (ci + .25 + .5 * hh));
+  let pa = px * 230.;
+  let tw = .6 + .4 * sin(t * (2. + 3. * hh.x) + hh.y * 40.);
+  sky += vec3f(.9, .95, 1.1) * (exp(-dd * dd / (pa * pa * .5)) * step(.982, hh.z) * pow((hh.z - .982) / .018, 2.) * 1.6 * tw) * ss(.06, .4, rd.y);
+  // the moon: a disc with its seas, a halo that spreads wider where thin cloud passes over it
+  let mu = vec2f(dot(rd - M, normalize(cross(M, vec3f(0., 1., 0.)))), rd.y - M.y) / .016;
+  let seas = textureSampleLevel(tD, sR, mu * .18 + .3, 0.).a;
+  let disc = ss(.0168, .0152, ma) * (.2 + 1.1 * ss(.35, .65, seas));
+  sky += vec3f(1., .96, .86) * (disc * .5 * (1. - .8 * thick)) + vec3f(.55, .6, .7) * (exp(-ma * ma * 900.) * .25 + exp(-ma * 9.) * .03);
+  // the clouds: lit from below by the orange of the town, their edges silvered where they pass by the moon
+  let cc = FCOL * (1.1 + 1.3 * thick) + vec3f(.5, .55, .65) * (exp(-ma * 7.) * .12 * (1. - thick * .6) * cov);
+  sky = mix(sky, cc, cov * .92);
+  // an aeroplane: red and green at the wingtips, a white double flash at the tail, a red beacon
+  if (g.pl.w > .5) {
+    let hd = vec3f(cos(g.pl.z), 0., sin(g.pl.z)); let sd = vec3f(0. - hd.z, 0., hd.x); let P = vec3f(g.pl.x, 1150., g.pl.y);
+    let ft = fract(t * .9); let fb = fract(t * 1.15 + .3);
+    var a = vec3f(1., .08, .05) * plight(rd, P - sd * 17., px) + vec3f(.1, 1., .3) * plight(rd, P + sd * 17., px);
+    a += vec3f(1.3) * (plight(rd, P - hd * 18., px) * (step(ft, .03) + step(abs(ft - .1), .015)) * 3.);
+    a += vec3f(1., .05, .02) * (plight(rd, P - vec3f(0., 2., 0.), px * 1.2) * step(fb, .08) * 2.);
+    sky += a * (1. - .75 * cov) * ss(.02, .25, rd.y);
+  }
+  return fin(mix(fogc(rd), sky, ss(-.02, .5, rd.y) * .9) + vec3f(1., .96, .86) * (disc * .25 * (1. - thick) * ss(.0, .2, rd.y)));
 }
 // snow: wraps around the camera in a 44 m cube, falls, drifts with the wind; bright where a lamp's cone catches it
 @vertex fn vsSnow(@builtin(vertex_index) vi: u32, @location(0) a: vec4f) -> VO {
@@ -507,23 +714,47 @@ fn quad(i: u32) -> vec2f { return vec2f(f32(i & 1u), f32(i >> 1u)) * 2. - 1.; }
   let m = ss(1., .15, length(i.uv));
   return vec4f(min(i.pr.rgb * (m * m * exp(-SIG * i.pr.w)), vec3f(12.)), 0.);
 }
+// loose snow driven low over the ground in the gusts: thin streaks running with the wind in a 40 m square round the camera
+@vertex fn vsDrift(@builtin(vertex_index) vi: u32, @location(0) a: vec4f) -> VO {
+  var o: VO; let q = quad(vi); let t = g.cam.w; let B = 40.;
+  let run = g.pap.y * (.6 + .8 * a.w);
+  var c = vec3f(a.x * B, 0., a.z * B) + WDIR * run + vec3f(0. - WDIR.z, 0., WDIR.x) * sin(run * .3 + a.y * 20.) * .6;
+  c = vec3f(g.cam.x + (fract((c.x - g.cam.x) / B + .5) - .5) * B, 0., g.cam.z + (fract((c.z - g.cam.z) / B + .5) - .5) * B);
+  c.y = .14 + .22 * a.y * a.y * abs(sin(run * 1.7 + a.x * 30.));
+  let len = .25 + .45 * a.w; let sdv = vec3f(0. - WDIR.z, 0., WDIR.x);
+  let w = c + WDIR * (q.y * len) + sdv * (q.x * .012) + vec3f(0., q.x * .012, 0.);
+  o.cp = g.vp * vec4f(w, 1.); o.uv = q; o.wp = c;
+  let d = length(c - g.cam.xyz);
+  let fade = ss(.3, .75, g.wind.w) * ss(B * .5, B * .3, d) * ss(.3, 1., d);
+  o.pr = vec4f((glow(c + vec3f(0., .2, 0.)) * .35 + FCOL * 1.2) * fade * .7, d);
+  if (fade <= 0.) { o.cp = vec4f(0., 0., 2., 1.); }
+  return o;
+}
+@fragment fn fsDrift(i: VO) -> @location(0) vec4f {
+  let m = (1. - abs(i.uv.x)) * ss(1., .2, abs(i.uv.y));
+  return vec4f(min(i.pr.rgb * (m * exp(-SIG * i.pr.w)), vec3f(6.)), 0.);
+}
 // glare: the star a lamp makes in a lens, the beacons on the mast and the chimney, lights of far cars and of the train
 @vertex fn vsGl(@builtin(vertex_index) vi: u32, @location(0) a: vec4f, @location(1) b: vec4f) -> VO {
   var o: VO; let q = quad(vi); let t = g.cam.w; let k = i32(b.w + .5);
   var p = a.xyz; var col = b.rgb;
-  if (k >= 10 && k < 40) { let L = g.lamp[k - 10]; col = L.c.rgb * select(.011, .12, L.c.w < 0.); }
+  if (k >= 100) { let L = g.lamp[k - 100]; col = L.c.rgb * select(.011, .12, L.c.w < 0.); }
   if (k == 1) { col *= .12 + .88 * ss(.0, .12, fract(t * .42)) * ss(.62, .45, fract(t * .42)); }
   if (k == 2) { col *= .12 + 1.6 * pow(max(sin(t * .7), 0.), 24.); }
-  if (k >= 40 && k < 48) {
-    // a car on the far road: white in front, red behind
-    let c = g.rc[(k - 40) & 3]; let rear = k >= 44;
-    p = vec3f(c.x + select(2., -2., rear) * c.y, .7, (${fl(ROADZ)}) - 1.8 * c.y);
+  if (k >= 60 && k < 80) {
+    // a vehicle on the highway: white in front, red behind, set by its length and height
+    let c = g.rc[(k - 60) % 10]; let rear = k >= 70; let vk = u32(c.w + .5); let hl = VEHL[vk];
+    p = vec3f(c.x + select(hl, 0. - hl, rear) * c.y, select(.7, 1.05, vk > 4u), ${fl(ROADZ)} - 1.8 * c.y);
     let f = max(dot(vec3f(c.y, 0., 0.), normalize(g.cam.xyz - p)), 0.);
     col = select(vec3f(3.4, 3.2, 2.8) * (.15 + 5. * f * f), vec3f(1.6, .06, .03), rear) * c.z;
   }
   if (k == 50) {
     p = vec3f(g.tr.x + select(-11.8, 224.2, g.tr.y > 0.), ${fl(RAILY + 3)}, ${fl(RAILZ)});
     let f = max(dot(vec3f(g.tr.y, 0., 0.), normalize(g.cam.xyz - p)), 0.); col *= (.2 + 6. * f * f * f) * g.tr.z;
+  }
+  if (k == 51) {
+    p = vec3f(g.tr2.x + g.tr2.y * .2, ${fl(RAILY + 3.6)}, ${fl(RAILZ)});
+    let f = max(dot(vec3f(g.tr2.y, 0., 0.), normalize(g.cam.xyz - p)), 0.); col *= (.2 + 6. * f * f * f) * g.tr2.z;
   }
   let v = p - g.cam.xyz; let d = length(v); let sz = a.w * (.3 + d * .017);
   let w = p + (g.right.xyz * q.x + g.up.xyz * q.y) * sz;
@@ -598,6 +829,7 @@ const W_RAYS = S_G + W_FS + /*wgsl*/`
   var acc = vec3f(0.);
   for (var k = 0; k < ${LAMPS.length}; k++) {
     let L = g.lamp[k]; let oc = ro - L.p.xyz; let R = L.p.w * select(.75, .95, L.c.w >= 0.);
+    if (L.c.w < -1.5) { continue; }
     let b = dot(oc, rd); let D2 = dot(oc, oc) - b * b; let h = R * R - D2;
     if (h <= 0.) { continue; }
     let s = sqrt(h); let t0 = max(0. - b - s, 0.); let t1 = min(s - b, tm);
