@@ -46,10 +46,10 @@ const tDummy = tex(1, 1, DEPTH, TU.RENDER_ATTACHMENT | TU.TEXTURE_BINDING);
 const tDetail = tex(1024, 1024, 'rgba8unorm', TU.RENDER_ATTACHMENT | TU.TEXTURE_BINDING, { mips: 11 });
 const tMap = tex(512, 512, 'rgba8unorm', TU.TEXTURE_BINDING | TU.COPY_DST);
 const tLamp = tex(128, 64, 'rgba8uint', TU.TEXTURE_BINDING | TU.COPY_DST);
-const tAtlas = tex(ATLAS, ATLAS, 'rgba8unorm', TU.TEXTURE_BINDING | TU.COPY_DST | TU.RENDER_ATTACHMENT, { mips: 12 });
+const tAtlas = tex(ATLAS, ATLASH, 'rgba8unorm', TU.TEXTURE_BINDING | TU.COPY_DST | TU.RENDER_ATTACHMENT, { mips: 12 });
 
 // the uniform block G (see shaders.js): offsets in floats
-const U_CAM = 16, U_RIGHT = 20, U_UP = 24, U_FWD = 28, U_RES = 32, U_MIS = 36, U_WIND = 40, U_PAP = 44, U_TR = 48, U_TR2 = 52, U_PL = 56, U_RC = 60, U_LAMP = U_RC + NRC * 4;
+const U_CAM = 16, U_RIGHT = 20, U_UP = 24, U_FWD = 28, U_RES = 32, U_MIS = 36, U_WIND = 40, U_PAP = 44, U_TR = 48, U_TR2 = 52, U_PL = 56, U_EV = 60, U_RC = 64, U_LAMP = U_RC + NRC * 4;
 const UB = new Float32Array(U_LAMP + NL * 8);
 const ubo = device.createBuffer({ size: UB.byteLength, usage: BU.UNIFORM | BU.COPY_DST });
 LAMPS.forEach((l, i) => UB.set([l.x, l.y, l.z, l.r, l.c[0], l.c[1], l.c[2], l.t], U_LAMP + i * 8));
@@ -125,7 +125,7 @@ addEventListener('pagehide', () => keep('htoneLoad', ''));
 const Wd = makeWorld(), meshes = Wd.meshes;
 // the decal atlas, and the decals with their cells looked up by name
 const AT = makeAtlas();
-Q.copyExternalImageToTexture({ source: AT.cv }, { texture: tAtlas, premultipliedAlpha: true }, [ATLAS, ATLAS]);
+Q.copyExternalImageToTexture({ source: AT.cv }, { texture: tAtlas, premultipliedAlpha: true }, [ATLAS, ATLASH]);
 const decF = new Float32Array(Wd.decals.length * 12);
 Wd.decals.forEach((d, i) => { decF.set(d.slice(0, 8), i * 12); decF.set(AT.R[d[8]], i * 12 + 8); });
 
@@ -165,7 +165,7 @@ const FLYN = FLY.length / 6, FLYT = 60, LUTN = 1024, flyLUT = new Float32Array(L
 // per-frame float state lives in one preallocated array, so the frame loop allocates no heap numbers
 const F = new Float64Array(128), P6 = new Float64Array(6);
 const CX = 0, CY = 1, CZ = 2, YAW = 3, PIT = 4, FX = 5, FY = 6, FZ = 7, RX = 8, RZ = 9, UX = 10, UY = 11, UZ = 12, VX = 13, VY = 14, VZ = 15, TIME = 16, FLT = 17, LAST = 18, GPU = 19, HUDT = 20, SPL = 21, MX = 22, MY = 23, MZ = 24,
-  GUST = 25, WX = 26, WZ = 27, PAP = 28, TRX = 29, TRD = 30, TRON = 31, FLK = 32, INR = 33, FRX = 34, FRD = 35, FRON = 36, PLX = 37, PLZ = 38, PLH = 39, PLON = 40, DRF = 41,
+  GUST = 25, WX = 26, WZ = 27, PAP = 28, TRX = 29, TRD = 30, TRON = 31, FLK = 32, INR = 33, FRX = 34, FRD = 35, FRON = 36, PLX = 37, PLZ = 38, PLH = 39, PLON = 40, DRF = 41, SNOWD = 42, EVA = 43, EVX = 44, EVS = 45, EVL = 46,
   RC = 48; // RC: NRC x (x, direction, present, kind)
 // aim the camera from P6 = position + look-at point
 function aim() {
@@ -354,12 +354,14 @@ function render() {
   m[U_FWD] = fx; m[U_FWD + 1] = fy; m[U_FWD + 2] = fz; m[U_FWD + 3] = NEAR;
   m[U_MIS] = EXPO; m[U_MIS + 1] = RAYS; m[U_MIS + 2] = det; m[U_MIS + 3] = F[GUST];
   m[U_WIND] = F[WX]; m[U_WIND + 1] = 0; m[U_WIND + 2] = F[WZ]; m[U_WIND + 3] = F[GUST];
-  m[U_PAP] = F[PAP]; m[U_PAP + 1] = F[DRF];
+  m[U_PAP] = F[PAP]; m[U_PAP + 1] = F[DRF]; m[U_PAP + 2] = F[SNOWD];
+  m[U_EV] = F[EVA]; m[U_EV + 1] = F[EVX]; m[U_EV + 2] = F[EVS]; m[U_EV + 3] = F[EVL];
   m[U_TR] = F[TRX]; m[U_TR + 1] = F[TRD]; m[U_TR + 2] = F[TRON];
   m[U_TR2] = F[FRX]; m[U_TR2 + 1] = F[FRD]; m[U_TR2 + 2] = F[FRON];
   m[U_PL] = F[PLX]; m[U_PL + 1] = F[PLZ]; m[U_PL + 2] = F[PLH]; m[U_PL + 3] = F[PLON];
   for (let k = 0; k < NRC * 4; k++) m[U_RC + k] = F[RC + k];
   { const o = U_LAMP + FLICK * 8 + 4, c = LAMPS[FLICK].c, f = F[FLK]; m[o] = c[0] * f; m[o + 1] = c[1] * f; m[o + 2] = c[2] * f; }
+  { const o = U_LAMP + FLICK2 * 8 + 4, c = LAMPS[FLICK2].c, f = fract(sin(floor(F[TIME] * 9) * 47.3) * 9631.7) > 0.8 || fract(F[TIME] / 17) > 0.9 ? 0.08 : 1; m[o] = c[0] * f; m[o + 1] = c[1] * f; m[o + 2] = c[2] * f; }
   { const o = U_LAMP + TVL * 8 + 4, c = LAMPS[TVL].c, f = 0.55 + 0.45 * fract(sin(floor(F[TIME] * 3) * 127.1) * 43758.5453); m[o] = c[0] * f; m[o + 1] = c[1] * f; m[o + 2] = c[2] * f; }
   Q.writeBuffer(ubo, 0, UB);
 
@@ -406,15 +408,25 @@ function render() {
 // ---------------------------------------------------------------- what moves on its own: wind, the bad lamp, the highway, the trains, the plane
 // All of it is a function of the scene time, so the picture and the sound (audio.js reads the same numbers) agree.
 // The trains take turns on the track: a passenger train, then a freight train, each every TRAINP seconds.
-const TRAINP = 210, TRAIN0 = 38, TRAINV = 22, FREIGHTV = 13, PLANEP = 170, PLANET = 75;
+const SALP = 290, SALT = 24, TRAINP = 210, TRAIN0 = 38, TRAINV = 22, FREIGHTV = 13, PLANEP = 170, PLANET = 75;
 function world(dt) {
   const t = F[TIME];
-  // wind: a slow swell with gusts riding on it, 0..1; the offset it has carried the air drives the snow
-  let g = 0.5 + 0.5 * sin(t * 0.13 + 1.3 * sin(t * 0.071)); g = 0.16 + 0.84 * pow(g, 1.6) * (0.62 + 0.38 * sin(t * 0.83 + 2 * sin(t * 0.31)));
+  // wind, 0..1: it dies down to almost nothing and rises again to a strong blow in a slow even swell (a little over a
+  // minute each way), with a light flutter on top when it is strong; the offset it has carried the air drives the snow
+  const sw = 0.5 - 0.5 * cos(t * TAU / 150 + 0.4 * sin(t * 0.013)); let g = 0.04 + 0.96 * sw * (0.9 + 0.1 * sin(t * 0.83 + 2 * sin(t * 0.31)));
   F[GUST] = g; const ws = 0.8 + 4.2 * g; F[WX] += WDX * ws * dt; F[WZ] += WDZ * ws * dt;
   F[PAP] += (g > 0.4 ? g - 0.4 : 0) * 6 * dt;
   // loose snow runs along the ground in the stronger gusts
   F[DRF] += (g > 0.3 ? g - 0.3 : 0) * 9 * dt;
+  // the snowfall: from a few flakes to a thick fall and back, on a slower swell of its own (the share of flakes shown)
+  { const s = 0.5 - 0.5 * cos(t * TAU / 230 + 2.1); F[SNOWD] = 0.04 + 0.96 * s * s; }
+  // events: the ambulance's lights at a far door (on for a while, off for a while), the level crossing while a train
+  // is near it, a salute far away (seconds since it began, -1 when none), a car alarm in the yard
+  F[EVA] = fract(t / 260 + 0.3) < 0.45 ? 1 : 0;
+  { const fr = F[FRON] > 0, on = fr || F[TRON] > 0, d = fr ? F[FRD] : F[TRD], x0 = fr ? F[FRX] - (d > 0 ? FRL : 0) : F[TRX] - 11, x1 = fr ? F[FRX] + (d > 0 ? 0 : FRL) : F[TRX] + 224;
+    F[EVX] = on && XING > x0 - (d > 0 ? 260 : 30) && XING < x1 + (d > 0 ? 30 : 260) ? 1 : 0; }
+  { const q = t + 140, c = floor(q / SALP), s = q - c * SALP; F[EVS] = s < SALT ? s : -1; }
+  F[EVL] = fract(t / 190 + 0.62) < 0.11 ? 1 : 0;
   // the failing lamp: stutters, and now and then goes out for a moment
   const n = fract(sin(floor(t * 13) * 91.7) * 43758.5), o = fract(t / 23 + 0.2) > 0.88;
   F[FLK] = o ? (fract(sin(floor(t * 7) * 33.1) * 9631.7) > 0.7 ? 0.9 : 0.04) : n > 0.86 ? 0.25 : 1;

@@ -4,9 +4,9 @@
 // Graffiti and plates by the doors, the intercom panels, shop signs, the goods in the shop windows, notices. Each item
 // is drawn into its own cell of one 2048 x 2048 texture; makeAtlas() returns the canvas and, per name, the cell as
 // [u0, v0, u1, v1]. world.js asks for the cells by name (see DECALS there).
-const ATLAS = 2048;
+const ATLAS = 2048, ATLASH = 3072;
 function makeAtlas() {
-  const cv = document.createElement('canvas'); cv.width = cv.height = ATLAS;
+  const cv = document.createElement('canvas'); cv.width = ATLAS; cv.height = ATLASH;
   const c = cv.getContext('2d'), R = {};
   rseed(77);
   // the cells are collected first, then packed tallest first in rows (8 px apart so the mip levels do not bleed)
@@ -16,9 +16,9 @@ function makeAtlas() {
     let px = 0, py = 0, rowH = 0;
     for (const { name, w, h, draw } of cells.sort((a, b) => b.h - a.h)) {
       if (px + w > ATLAS) { px = 0; py += rowH + 8; rowH = 0; }
-      if (py + h > ATLAS) throw new Error('decal atlas full at ' + name);
+      if (py + h > ATLASH) throw new Error('decal atlas full at ' + name);
       c.save(); c.translate(px, py); c.beginPath(); c.rect(0, 0, w, h); c.clip(); draw(w, h); c.restore();
-      R[name] = [px / ATLAS, py / ATLAS, (px + w) / ATLAS, (py + h) / ATLAS];
+      R[name] = [px / ATLAS, py / ATLASH, (px + w) / ATLAS, (py + h) / ATLASH];
       px += w + 8; rowH = max(rowH, h);
     }
   };
@@ -234,6 +234,95 @@ function makeAtlas() {
       c.fillStyle = '#c8d0cc'; c.fillRect(0, y, w, 8);
     }
     c.fillStyle = 'rgba(40,160,80,.85)'; c.fillRect(w * 0.38, 20, w * 0.24, 50); c.fillStyle = '#fff'; c.font = `bold 34px ${FN}`; c.textAlign = 'center'; c.fillText('СКИДКИ', w / 2, 58);
+  });
+  // ---- the doors of the entrances: painted steel, each its own colour, a code lock, maybe a little barred window
+  const DOORC = ['#4a2e1c', '#23402e', '#5a5e60', '#24365c', '#5c1e1e', '#2a2a2a', '#6a5030', '#3c4a3c'];
+  DOORC.forEach((col, i) => cell('door' + i, 140, 212, (w, h) => {
+    c.fillStyle = '#1a1a1a'; c.fillRect(0, 0, w, h); c.fillStyle = col; c.fillRect(6, 6, w - 12, h - 6);
+    const g = c.createLinearGradient(0, 0, w, h); g.addColorStop(0, 'rgba(255,255,255,.08)'); g.addColorStop(1, 'rgba(0,0,0,.25)'); c.fillStyle = g; c.fillRect(6, 6, w - 12, h - 6);
+    c.strokeStyle = 'rgba(0,0,0,.45)'; c.lineWidth = 3; if (i % 3 !== 1) c.strokeRect(18, 20, w - 36, h - 44);
+    if (i % 2) { c.fillStyle = '#d8c080'; c.fillRect(46, 26, 48, 34); c.strokeStyle = '#222'; c.lineWidth = 3; for (let k = 1; k < 4; k++) { c.beginPath(); c.moveTo(46 + k * 12, 26); c.lineTo(46 + k * 12, 60); c.stroke(); } }
+    c.fillStyle = '#b0b0a8'; c.fillRect(w - 36, 98, 8, 30); c.fillStyle = '#222'; c.fillRect(w - 40, 90, 16, 8); // handle
+    c.fillStyle = '#c8c8c0'; c.fillRect(w - 40, 70, 18, 12); // the lock of the code
+    for (let k = 0; k < 6; k++) { c.fillStyle = 'rgba(0,0,0,.4)'; c.beginPath(); c.arc(12, 20 + k * 36, 2.5, 0, TAU); c.fill(); }
+    // scuffs and rust low down
+    for (let k = 0; k < 40; k++) { c.fillStyle = `rgba(${90 + rnd() * 60 | 0},${50 + rnd() * 30 | 0},20,${rnd() * 0.25})`; c.fillRect(rr(6, w - 10), rr(h * 0.75, h - 4), rr(2, 10), rr(1, 4)); }
+  }));
+  // a Christmas wreath with a red bow
+  cell('wreath', 112, 112, (w) => {
+    c.translate(w / 2, w / 2);
+    for (let k = 0; k < 120; k++) { const a = rr(0, TAU), r = rr(28, 44); c.fillStyle = pick(['#1c4a24', '#24602c', '#123818', '#2e7034']); c.save(); c.translate(cos(a) * r, sin(a) * r); c.rotate(a + rr(-1, 1)); c.fillRect(-9, -2, 18, 4); c.restore(); }
+    for (let k = 0; k < 9; k++) { const a = k * TAU / 9; c.fillStyle = pick(['#e02020', '#f0c020', '#e0e0e0']); c.beginPath(); c.arc(cos(a) * 36, sin(a) * 36, 4, 0, TAU); c.fill(); }
+    c.fillStyle = '#c01818'; c.beginPath(); c.moveTo(0, 36); c.lineTo(-18, 26); c.lineTo(-18, 48); c.closePath(); c.fill(); c.beginPath(); c.moveTo(0, 36); c.lineTo(18, 26); c.lineTo(18, 48); c.closePath(); c.fill();
+  });
+  // ---- notices with tear-off strips (the strips are separate decals that flutter, see `tab`)
+  const NOTES = [['ПРОДАМ', 'ГАРАЖ', 'кирпичный, яма, свет'], ['ПРОПАЛ', 'КОТ', 'рыжий, откликается на Барсик'], ['РЕМОНТ', 'КВАРТИР', 'плитка, обои, сантехника'], ['РЕПЕТИТОР', 'МАТЕМАТИКА', 'подготовка к экзаменам'],
+    ['СДАМ', 'КОМНАТУ', 'недорого, без посредников'], ['КУПЛЮ', 'КВАРТИРУ', 'в этом районе'], ['МАНИКЮР', 'НА ДОМУ', 'аккуратно, недорого'], ['ГРУЗО-', 'ПЕРЕВОЗКИ', 'грузчики, переезды']];
+  NOTES.forEach(([a, b, d], i) => cell('tear' + i, 200, 168, (w, h) => {
+    c.fillStyle = pick(['#f4f2ea', '#f0f0f0', '#f6f0d8', '#e8f0f4']); c.fillRect(0, 0, w, h);
+    c.fillStyle = 'rgba(0,0,0,.06)'; c.fillRect(0, h - 6, w, 6);
+    c.textAlign = 'center'; c.fillStyle = i === 1 ? '#c01010' : '#111'; fit(a, FB, 34, w - 16); c.fillText(a, w / 2, 40); fit(b, FB, 34, w - 16); c.fillText(b, w / 2, 78);
+    c.fillStyle = '#333'; fit(d, FN, 16, w - 16); c.fillText(d, w / 2, 106); fit('тел. 8-9' + (10 + i * 7) + '-...', FN, 18, w - 16); c.fillText('тел. 8-9' + (10 + i * 7) + '-' + (100 + i * 37) + '-' + (10 + i * 9), w / 2, 134);
+    if (i === 1) { c.fillStyle = '#222'; c.beginPath(); c.ellipse(26, 120, 14, 11, 0, 0, TAU); c.fill(); c.beginPath(); c.moveTo(16, 112); c.lineTo(18, 100); c.lineTo(24, 110); c.moveTo(36, 112); c.lineTo(34, 100); c.lineTo(28, 110); c.fill(); }
+  }));
+  [0, 1, 2].forEach((i) => cell('tab' + i, 28, 112, (w, h) => {
+    c.fillStyle = ['#f4f2ea', '#f0f0f0', '#f6f0d8'][i]; c.fillRect(1, 0, w - 2, h); c.fillStyle = 'rgba(0,0,0,.08)'; c.fillRect(w - 3, 0, 2, h);
+    c.save(); c.translate(w / 2 + 5, h - 6); c.rotate(-PI / 2); c.fillStyle = '#222'; c.font = `14px ${FN}`; c.fillText('8-9' + (10 + i * 23) + '-' + (200 + i * 61) + '-' + (40 + i * 7), 0, 0); c.restore();
+  }));
+  // ---- the cash machine in a wall, a billboard, road signs
+  cell('atm', 120, 180, (w, h) => {
+    c.fillStyle = '#2a3a50'; c.fillRect(0, 0, w, h); c.fillStyle = '#d0d8e0'; c.fillRect(8, 8, w - 16, 26); c.fillStyle = '#1a2a40'; c.font = `bold 18px ${FN}`; c.textAlign = 'center'; c.fillText('БАНКОМАТ', w / 2, 28);
+    const g = c.createLinearGradient(0, 44, 0, 104); g.addColorStop(0, '#4aa0e8'); g.addColorStop(1, '#1a60b0'); c.fillStyle = g; c.fillRect(18, 44, w - 36, 60);
+    c.fillStyle = '#fff'; c.font = `12px ${FN}`; c.fillText('ВСТАВЬТЕ КАРТУ', w / 2, 78);
+    c.fillStyle = '#888'; for (let k = 0; k < 12; k++) c.fillRect(30 + (k % 3) * 22, 116 + (k / 3 | 0) * 14, 16, 10); c.fillStyle = '#40e060'; c.fillRect(w - 26, 120, 10, 4); c.fillStyle = '#111'; c.fillRect(20, 168, w - 40, 6);
+  });
+  cell('advert0', 512, 256, (w, h) => {
+    const g = c.createLinearGradient(0, 0, w, h); g.addColorStop(0, '#f0a020'); g.addColorStop(1, '#d04010'); c.fillStyle = g; c.fillRect(0, 0, w, h);
+    c.fillStyle = '#fff'; c.textAlign = 'left'; fit('ОКНА  ДВЕРИ', FB, 64, w * 0.6); c.fillText('ОКНА  ДВЕРИ', 24, 86); fit('БАЛКОНЫ ПОД КЛЮЧ', FB, 30, w * 0.6); c.fillText('БАЛКОНЫ ПОД КЛЮЧ', 24, 130);
+    c.fillStyle = '#ffe860'; c.font = `bold 46px ${FB}`; c.fillText('-30%', 24, 214);
+    c.fillStyle = '#e8f0f8'; c.fillRect(340, 30, 140, 190); c.strokeStyle = '#fff'; c.lineWidth = 10; c.strokeRect(340, 30, 140, 190); c.beginPath(); c.moveTo(410, 30); c.lineTo(410, 220); c.moveTo(340, 110); c.lineTo(480, 110); c.stroke();
+  });
+  cell('advert1', 512, 256, (w, h) => {
+    const g = c.createLinearGradient(0, 0, 0, h); g.addColorStop(0, '#163a6a'); g.addColorStop(1, '#2a70b0'); c.fillStyle = g; c.fillRect(0, 0, w, h);
+    c.fillStyle = '#d8e8f0'; for (let k = 0; k < 4; k++) { const x = 300 + k * 50, hh = 90 + k * 30; c.fillRect(x, h - hh, 40, hh); c.fillStyle = '#f0e070'; for (let y = h - hh + 10; y < h - 10; y += 16) for (let xx = x + 6; xx < x + 36; xx += 12) if (rnd() < 0.5) c.fillRect(xx, y, 6, 8); c.fillStyle = '#d8e8f0'; }
+    c.fillStyle = '#fff'; c.textAlign = 'left'; fit('НОВЫЙ ДОМ', FB, 56, 270); c.fillText('НОВЫЙ ДОМ', 24, 80); fit('квартиры от застройщика', FN, 26, 270); c.fillText('квартиры от застройщика', 24, 120);
+    c.fillStyle = '#ffd040'; fit('ИПОТЕКА 6%', FB, 40, 260); c.fillText('ИПОТЕКА 6%', 24, 200);
+  });
+  const rsign = (name, draw) => cell(name, 96, 96, (w) => { c.translate(w / 2, w / 2); draw(); });
+  const tri = (fill) => { c.fillStyle = '#c01010'; c.beginPath(); c.moveTo(0, -44); c.lineTo(46, 38); c.lineTo(-46, 38); c.closePath(); c.fill(); c.fillStyle = fill; c.beginPath(); c.moveTo(0, -28); c.lineTo(33, 30); c.lineTo(-33, 30); c.closePath(); c.fill(); c.fillStyle = '#111'; };
+  rsign('rsKids', () => { tri('#f4f4f4'); c.beginPath(); c.arc(-8, -6, 4, 0, TAU); c.arc(8, -2, 3.5, 0, TAU); c.fill(); c.fillRect(-11, -1, 6, 16); c.fillRect(6, 2, 5, 13); c.fillRect(-12, 15, 3, 10); c.fillRect(-7, 15, 3, 10); c.fillRect(6, 15, 3, 9); c.fillRect(10, 15, 3, 9); });
+  rsign('rsBump', () => { tri('#f4f4f4'); c.beginPath(); c.moveTo(-24, 24); c.quadraticCurveTo(0, -4, 24, 24); c.fill(); });
+  rsign('rsPed', () => { c.fillStyle = '#1050b0'; c.fillRect(-44, -44, 88, 88); c.fillStyle = '#fff'; c.beginPath(); c.moveTo(0, -38); c.lineTo(38, 30); c.lineTo(-38, 30); c.closePath(); c.fill(); c.fillStyle = '#111'; c.beginPath(); c.arc(2, -10, 4, 0, TAU); c.fill(); c.fillRect(-2, -5, 6, 14); c.fillRect(-6, 9, 3, 12); c.fillRect(4, 9, 3, 12); for (let k = 0; k < 4; k++) c.fillRect(-26 + k * 14, 24, 8, 4); });
+  rsign('rsStop', () => { c.fillStyle = '#c01010'; c.beginPath(); c.arc(0, 0, 44, 0, TAU); c.fill(); c.fillStyle = '#fff'; c.fillRect(-32, -8, 64, 16); });
+  rsign('rsPark', () => { c.fillStyle = '#1050b0'; c.fillRect(-44, -44, 88, 88); c.fillStyle = '#fff'; c.font = `bold 72px ${FN}`; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText('P', 0, 4); });
+  // ---- signs of the little shops, their windows, a shutter
+  const sign = (name, w, h, bg, fg, text, font = FB) => cell(name, w, h, () => { c.fillStyle = bg; c.fillRect(0, 0, w, h); c.fillStyle = fg; c.textAlign = 'center'; c.textBaseline = 'middle'; fit(text, font, h * 0.7, w - 16); c.fillText(text, w / 2, h / 2 + 2); });
+  sign('press', 320, 64, '#1a3a80', '#fff', 'ПЕЧАТЬ');
+  sign('shaw', 320, 72, '#300808', '#ffb020', 'ШАУРМА 24');
+  sign('flowers', 320, 72, '#103018', '#ff70b0', 'ЦВЕТЫ 24');
+  sign('beer', 256, 64, '#3a1c06', '#ffd040', 'ПИВО');
+  sign('post', 320, 64, '#1040a0', '#fff', 'ПОЧТА');
+  sign('school', 400, 64, '#f0f0e8', '#1a3a80', 'ШКОЛА № 7', FN);
+  sign('kinder', 400, 64, '#f8f0d0', '#c02020', 'ДЕТСКИЙ САД «РОМАШКА»', FN);
+  sign('taxi', 128, 48, '#f0c010', '#111', 'ТАКСИ');
+  cell('danger', 96, 80, (w, h) => { c.fillStyle = '#f0d020'; c.beginPath(); c.moveTo(w / 2, 2); c.lineTo(w - 2, h - 26); c.lineTo(2, h - 26); c.closePath(); c.fill(); c.fillStyle = '#111'; c.beginPath(); c.moveTo(52, 14); c.lineTo(40, 34); c.lineTo(50, 34); c.lineTo(42, 50); c.lineTo(58, 28); c.lineTo(48, 28); c.closePath(); c.fill(); c.fillStyle = '#f4f4f0'; c.fillRect(0, h - 24, w, 24); c.fillStyle = '#c01010'; c.textAlign = 'center'; fit('НЕ ВЛЕЗАЙ! УБЬЁТ!', FB, 14, w - 6); c.fillText('НЕ ВЛЕЗАЙ! УБЬЁТ!', w / 2, h - 7); });
+  cell('shutter', 192, 128, (w, h) => { c.fillStyle = '#8a8c88'; c.fillRect(0, 0, w, h); for (let y = 0; y < h; y += 8) { c.fillStyle = 'rgba(0,0,0,.3)'; c.fillRect(0, y, w, 2); c.fillStyle = 'rgba(255,255,255,.12)'; c.fillRect(0, y + 2, w, 1); } c.fillStyle = '#333'; c.fillRect(w / 2 - 10, h - 12, 20, 6); });
+  cell('shawWin', 256, 128, (w, h) => {
+    const g = c.createLinearGradient(0, 0, 0, h); g.addColorStop(0, '#f0c080'); g.addColorStop(1, '#a06030'); c.fillStyle = g; c.fillRect(0, 0, w, h);
+    c.fillStyle = '#8a4a20'; c.beginPath(); c.ellipse(60, 70, 22, 48, 0, 0, TAU); c.fill(); c.fillStyle = '#c08040'; c.fillRect(56, 14, 8, 110);
+    c.fillStyle = '#d0d0d0'; c.fillRect(110, 92, 130, 8); c.fillStyle = '#e8e0d0'; for (let k = 0; k < 5; k++) c.fillRect(120 + k * 24, 72, 18, 20);
+    c.fillStyle = '#fff'; c.font = `bold 18px ${FN}`; c.fillText('180 р', 150, 40);
+  });
+  cell('flowerWin', 256, 128, (w, h) => {
+    c.fillStyle = '#d8e8d8'; c.fillRect(0, 0, w, h);
+    for (let k = 0; k < 60; k++) { c.fillStyle = pick(['#e02040', '#f080b0', '#f0f0f0', '#f0c020', '#c02080', '#ff6060']); c.beginPath(); c.arc(rr(10, w - 10), rr(30, 90), rr(4, 8), 0, TAU); c.fill(); }
+    c.fillStyle = '#2a5a2a'; for (let k = 0; k < 40; k++) c.fillRect(rr(10, w - 10), rr(60, 110), 2, rr(10, 30)); c.fillStyle = '#3a4a5a'; for (let k = 0; k < 6; k++) c.fillRect(14 + k * 40, 96, 30, 32);
+    const g = c.createRadialGradient(w / 2, h / 2, 20, w / 2, h / 2, 160); g.addColorStop(0, 'rgba(255,255,255,.1)'); g.addColorStop(1, 'rgba(255,255,255,.55)'); c.fillStyle = g; c.fillRect(0, 0, w, h);
+  });
+  cell('clockBig', 128, 128, (w) => {
+    c.translate(w / 2, w / 2); c.fillStyle = '#f0ece0'; c.beginPath(); c.arc(0, 0, 60, 0, TAU); c.fill(); c.lineWidth = 6; c.strokeStyle = '#222'; c.stroke();
+    for (let k = 0; k < 12; k++) { c.save(); c.rotate(k * PI / 6); c.fillStyle = '#222'; c.fillRect(-2, -54, 4, k % 3 ? 8 : 14); c.restore(); }
+    c.lineCap = 'round'; c.lineWidth = 6; c.beginPath(); c.moveTo(0, 0); c.lineTo(cos(-2.2) * 30, sin(-2.2) * 30); c.stroke(); c.lineWidth = 4; c.beginPath(); c.moveTo(0, 0); c.lineTo(cos(-0.6) * 46, sin(-0.6) * 46); c.stroke();
   });
   pack();
   return { cv, R };

@@ -6,8 +6,10 @@
 // engines of the trucks and buses), the trains (rumble, wheels over the rail joints, horn; the freight train heavier
 // and slower), an aeroplane high up, the buzz of the failing lamp, the creak of the swing; and the sounds of the yard
 // placed where they come from (world.js lists them in Wd.snd): music in two cars by the doors, radios and cooking and
-// televisions behind some windows, people whistling on the roofs, dogs in the private houses. In the room the window
-// glass muffles all of it and a clock ticks.
+// televisions behind some windows, people whistling on the roofs, dogs in the private houses, the hum of the
+// transformer and of the lift machinery, the creak of the roundabout, a janitor's scraper, a taxi idling, a car alarm,
+// somebody drunk singing on his way, crows, the church bell, the bell of the level crossing, drips off the icicles; and
+// a salute far away, heard late. In the room the window glass muffles all of it and a clock ticks.
 let AC, OUT, muted = false;
 const VOL = 0.8; // master level
 function mkSound(ac) {
@@ -52,15 +54,17 @@ function mkSound(ac) {
   // R: the distance (m) at which it is at half level; far: beyond it nothing is played; wv: how much echo
   // the room the viewer starts in: what plays in it is muffled from outside instead of from inside
   const room = BQ('lowpass', 16000, 0.5, out);
-  const KIND = { tvroom: [2.5, 40, 0], music: [7, 70, 0.25], radio: [5, 40, 0.2], cook: [3.5, 25, 0.1], tv: [4, 30, 0.15], whistle: [14, 120, 0.6], dog: [45, 400, 1.4] };
+  const KIND = { tvroom: [2.5, 40, 0], music: [7, 70, 0.25], radio: [5, 40, 0.2], cook: [3.5, 25, 0.1], tv: [4, 30, 0.15], whistle: [14, 120, 0.6], dog: [45, 400, 1.4],
+    hum: [3, 30, 0], creak: [7, 70, 0.7], scrape: [10, 90, 0.6], idle: [5, 45, 0.2], alarm: [35, 300, 1], drunk: [12, 110, 0.6], crow: [25, 220, 1], bell: [160, 700, 1.6],
+    xing: [30, 300, 0.8], drip: [2.5, 18, 0.3], lift: [3.5, 30, 0.2] };
   const note = (m) => 440 * 2 ** ((m - 69) / 12);
   // an envelope on a gain: up in a, down over d
   const env = (p, t, a, v, d) => { p.setValueAtTime(0.0001, t); p.linearRampToValueAtTime(v, t + a); p.exponentialRampToValueAtTime(0.0001, t + a + d); };
   // a short voice: oscillator of type `ty` at f through `to`, enveloped, stopping by itself
   const tone = (ty, f, t, a, v, d, to, f2) => { const g = G(0, to), o = N(OscillatorNode, { type: ty, frequency: f }, g); if (f2) o.frequency.exponentialRampToValueAtTime(f2, t + a + d); env(g.gain, t, a, v, d); o.stop(t + a + d + 0.05); return o; };
   const burst = (f, q, t, v, d, to, type = 'bandpass') => { const g = G(0, to), s = N(AudioBufferSourceNode, { buffer: nw, playbackRate: 1 }, BQ(type, f, q, g)); s.stop(t + d + 0.05); env(g.gain, t, 0.002, v, d); };
-  const S = Wd.snd.map(([kind, x, y, z], i) => {
-    const [R, far, wv] = KIND[kind], p = kind === 'tvroom' ? pan(room) : pan(glass, G(wv, wet)), lvl = G(0, p), o = { kind, x, y, z, R, far, p, lvl, next: 0, step: 0, seed: i * 7.31 + 1, on: 0 };
+  const S = Wd.snd.map(([kind, x, y, z, w], i) => {
+    const [R, far, wv] = KIND[kind], p = kind === 'tvroom' ? pan(room) : pan(glass, G(wv, wet)), lvl = G(0, p), o = { kind, x, y, z, w, R, far, p, lvl, next: 0, step: 0, seed: i * 7.31 + 1, on: 0 };
     if (kind === 'music') {
       // inside a closed car: only the bass and the thump come through
       o.f = BQ('lowpass', 420, 1.2, lvl); o.bpm = i & 1 ? 100 : 92; o.key = i & 1 ? 45 : 43;
@@ -77,12 +81,34 @@ function mkSound(ac) {
     } else if (kind === 'whistle') {
       o.wg = G(0, lvl); o.wo = OSC('sine', 1200, o.wg); lfo(5.3 + i * 0.4, 14, o.wo.frequency);
       o.br = G(0, lvl); src(nw, 1, BQ('bandpass', 1300, 12, o.br));
+    } else if (kind === 'hum') {
+      // the transformer: the mains hum and its harmonics, a little buzz
+      for (const [f, v] of [[100, 0.12], [200, 0.06], [300, 0.02]]) OSC('sine', f, G(v, lvl));
+      OSC('sawtooth', 100, BQ('bandpass', 1800, 4, G(0.015, lvl)));
+    } else if (kind === 'lift') {
+      // the lift motor under its roof: a low drone that rises while the car moves
+      o.mg = G(0.05, lvl); OSC('sawtooth', 50, BQ('lowpass', 160, 1, o.mg)); o.wh = G(0, lvl); OSC('sine', 330, o.wh);
+    } else if (kind === 'idle') {
+      // an engine idling: a low throb
+      o.f = BQ('lowpass', 150, 1, lvl); const e = OSC('sawtooth', 31, G(0.3, o.f)); lfo(0.37, 1.2, e.frequency);
+      const am = G(0.15, o.f); src(nb, 1.6, am); lfo(15.5, 0.2, am.gain);
+    } else if (kind === 'alarm') {
+      o.ag = G(0, lvl); o.ao = OSC('square', 800, BQ('bandpass', 1400, 1.5, o.ag));
+    } else if (kind === 'drunk') {
+      // a man's voice through two formants, slurring from note to note
+      o.vg = G(0, lvl); o.vo = OSC('sawtooth', 110, (o.f1 = BQ('bandpass', 600, 5, o.vg)), (o.f2 = BQ('bandpass', 1100, 7, o.vg)));
     }
     return o;
   });
   // whistled phrases: a pentatonic walk, the same few motifs coming back
   const PENTA = [0, 2, 4, 7, 9, 12, 14, 16];
   let dogT = ac.currentTime + 8;
+  // the salute: the same bursts as the sky shader draws (h33 there), heard d / 340 s later from the north-west
+  const h33 = (x, y, z) => {
+    let a = fract(x * 0.1031), b = fract(y * 0.1030), c = fract(z * 0.0973); const d = a * (b + 33.33) + b * (a + 33.33) + c * (c + 33.33); a += d; b += d; c += d;
+    return [fract((a + a) * c), fract((a + b) * b), fract((b + a) * a)];
+  };
+  const salP = pan(glass, G(1.2, wet)), salG = G(0.5, salP); let salDone = -1;
 
   let lt = ac.currentTime, tClk = 0, tHorn = -1, tCr = lt + 2, tTick = lt + 1, nTick = 0, was = 0, wasK = 0;
   out.gain.setTargetAtTime(VOL, lt, 1.5);
@@ -96,7 +122,7 @@ function mkSound(ac) {
     wind.gain.setTargetAtTime(0.1 + 0.8 * gu * gu, t, 0.4); windF.frequency.setTargetAtTime(240 + 760 * gu, t, 0.5);
     whis.gain.setTargetAtTime(0.5 * sstep(0.5, 0.95, gu), t, 0.3); whisF.frequency.setTargetAtTime(880 + 520 * gu, t, 0.5);
     cars.forEach((c, k) => {
-      const o = RC + k * 4, dz = ROADZ - 1.8 * F[o + 1] - cz, dx = F[o] - cx, d = hypot(dx, dz), on = F[o + 2], big = F[o + 3] > 4 ? 1 : 0, heavy = F[o + 3] === 5 || F[o + 3] === 6 || F[o + 3] === 8;
+      const o = RC + k * 4, dz = ROADZ - 1.8 * F[o + 1] - cz, dx = F[o] - cx, d = hypot(dx, dz), on = F[o + 2], big = F[o + 3] > 4 ? 1 : 0, heavy = F[o + 3] === 5 || F[o + 3] === 6 || F[o + 3] === 8 || F[o + 3] > 9;
       c.g.gain.setTargetAtTime(on * (big ? 34 : 22) / (40 + d), t, 0.3); c.f.frequency.setTargetAtTime((big ? 220 : 350) + 9e4 / (d + 60), t, 0.3); c.p.pan.setTargetAtTime(side(dx, dz), t, 0.2);
       c.eg.gain.setTargetAtTime(on * (heavy ? 30 : 0) / (30 + d), t, 0.3); c.eo.frequency.setTargetAtTime(heavy ? 46 + 6 * sin(now * 0.3 + k) : 50, t, 0.5);
     });
@@ -135,6 +161,7 @@ function mkSound(ac) {
     // ---- the sounds of the yard
     const ahead = t + 0.25;
     for (const o of S) {
+      if (o.w) { const p = walkAt(o.w, F[TIME]); o.x = p[0]; o.z = p[1]; }
       const dx = o.x - cx, dy = o.y - cy, dz = o.z - cz, d = hypot(dx, dy, dz), lv = 1 / (1 + (d / o.R) ** 2), near = d < o.far;
       o.lvl.gain.setTargetAtTime(near ? lv : 0, t, 0.3); o.p.pan.setTargetAtTime(side(dx, dz) * min(1, d / 3), t, 0.2);
       if (!near) { o.next = 0; continue; }
@@ -174,6 +201,52 @@ function mkSound(ac) {
       } else if (o.kind === 'cook') {
         for (; o.next < ahead; o.next += 0.02) if (rnd() < 0.35) { o.sz.gain.setValueAtTime(rr(0.15, 0.45), o.next); o.sz.gain.setTargetAtTime(0.08, o.next + 0.005, 0.01); }
         if (rnd() < 0.012) tone('sine', rr(1800, 3400), t + 0.1, 0.002, 0.15, 0.5, o.lvl);
+      } else if (o.kind === 'creak') {
+        // the roundabout: a groan of its bearing when the wind shoves it
+        if (rnd() < 0.05 * sstep(0.3, 0.9, gu)) { const f = rr(380, 620); tone('triangle', f, t + 0.05, 0.08, 0.5, rr(0.4, 0.9), BQ('bandpass', 900, 3, o.lvl), f * rr(0.7, 1.3)); }
+      } else if (o.kind === 'scrape') {
+        // a scraper pushed over the asphalt: strokes, and a pause to throw the snow aside
+        for (; o.next < ahead; o.step++) {
+          const a = o.next; if (o.step % 6 === 5) { o.next = a + rr(1.5, 3.5); continue; }
+          burst(rr(900, 1600), 1.2, a, 0.35, rr(0.45, 0.8), o.lvl); burst(300, 1, a, 0.25, 0.5, o.lvl, 'lowpass'); o.next = a + rr(0.9, 1.3);
+        }
+      } else if (o.kind === 'idle') {
+        o.f.frequency.setTargetAtTime(120 + 300 / (1 + d * 0.3), t, 0.3);
+      } else if (o.kind === 'alarm') {
+        const on = F[EVL] > 0; o.ag.gain.setTargetAtTime(on ? 0.35 : 0, t, 0.02);
+        if (on) for (let k = 0; k < 2; k++) { const a = t + k * 0.05; o.ao.frequency.setValueAtTime(700, a); o.ao.frequency.linearRampToValueAtTime(1500, a + 0.045); }
+      } else if (o.kind === 'lift') {
+        if (rnd() < 0.006) {
+          const a = t + 0.05, n = rr(6, 14); o.mg.gain.setTargetAtTime(0.16, a, 0.6); o.mg.gain.setTargetAtTime(0.05, a + n, 0.6); o.wh.gain.setTargetAtTime(0.02, a, 0.8); o.wh.gain.setTargetAtTime(0, a + n, 0.5);
+          burst(200, 1, a, 0.6, 0.12, o.lvl, 'lowpass'); burst(220, 1, a + n, 0.6, 0.12, o.lvl, 'lowpass');
+        }
+      } else if (o.kind === 'drip') {
+        for (; o.next < ahead;) { const a = o.next, f = rr(1600, 3200); tone('sine', f, a, 0.001, rr(0.1, 0.3), 0.06, o.lvl, f * 0.8); o.next = a + rr(0.4, 2.8); }
+      } else if (o.kind === 'crow') {
+        if (o.step < t && rnd() < 0.03) {
+          for (let k = 0, a = t + 0.1; k < 2 + (rnd() * 3 | 0); k++, a += rr(0.35, 0.6)) { const f = rr(330, 420); tone('sawtooth', f, a, 0.02, 0.4, 0.28, BQ('bandpass', 1300, 2.5, o.lvl), f * 0.75); burst(1600, 1, a, 0.25, 0.25, o.lvl); }
+          o.step = t + rr(15, 45);
+        }
+      } else if (o.kind === 'bell') {
+        // the church bell: a few strikes every few minutes, inharmonic partials, a long ring
+        if (o.next < t + 0.1) {
+          if (o.step > 0) {
+            for (const [m, v, dd] of [[1, 0.5, 4.5], [2, 0.3, 3], [2.4, 0.22, 2.5], [3, 0.15, 2], [4.2, 0.1, 1.4], [0.5, 0.25, 5]]) tone('sine', 196 * m, t + 0.05, 0.003, v, dd, o.lvl);
+            o.step--; o.next = t + 2.2;
+          } else { o.step = 5 + (rnd() * 8 | 0); o.next = t + rr(120, 240); }
+        }
+      } else if (o.kind === 'xing') {
+        if (F[EVX] > 0) for (; o.next < ahead; o.next += 0.5) { tone('sine', 1250, o.next, 0.002, 0.5, 0.35, o.lvl); tone('sine', 2650, o.next, 0.002, 0.2, 0.2, o.lvl); }
+        else o.next = 0;
+      } else if (o.kind === 'drunk') {
+        // phrases of a song, slurred, then a pause
+        for (; o.next < ahead; o.step++) {
+          const a = o.next;
+          if (o.step % 12 === 11) { o.vg.gain.setTargetAtTime(0, a, 0.1); o.next = a + rr(3, 9); continue; }
+          const m = 45 + [0, 3, 5, 7, 5, 3, 0, -2][(o.step + (o.seed | 0)) % 8] + (rnd() < 0.2 ? rr(-1, 1) : 0), dur = rr(0.35, 0.8);
+          o.vo.frequency.setTargetAtTime(note(m), a, 0.08); o.f1.frequency.setTargetAtTime(rr(450, 800), a, 0.05); o.f2.frequency.setTargetAtTime(rr(900, 1500), a, 0.05);
+          o.vg.gain.setTargetAtTime(rr(0.3, 0.55), a, 0.05); o.vg.gain.setTargetAtTime(0.12, a + dur * 0.8, 0.08); o.next = a + dur;
+        }
       } else if (o.kind === 'whistle') {
         // phrases of a few notes with a glide between them, then a breath
         for (; o.next < ahead;) {
@@ -186,6 +259,17 @@ function mkSound(ac) {
         }
       }
     }
+    // the salute: each burst a thump and a crackle, late by the distance
+    const sq = F[TIME] + 140, sp = sq - floor(sq / SALP) * SALP;
+    if (sp < SALT + 8) {
+      const D = 1500 / 340; salP.pan.setTargetAtTime(side(-0.55, -0.83), t, 0.3);
+      for (let b = salDone + 1; b < 16; b++) {
+        const hb = h33(b, 9.3, 1.1), a = t + (b * 1.45 + hb[0] * 0.6 + D - sp);
+        if (a >= ahead) break;
+        salDone = b; if (a < t) continue;
+        burst(180, 0.8, a, 0.5, 0.6, salG, 'lowpass'); for (let k = 0; k < 18; k++) burst(rr(2000, 6000), 2, a + 0.3 + rr(0, 1.1), rr(0.04, 0.12), 0.02, salG);
+      }
+    } else salDone = -1;
     // dogs: now and then one howls or barks, and another may answer
     if (t > dogT) {
       const dogs = S.filter((o) => o.kind === 'dog');

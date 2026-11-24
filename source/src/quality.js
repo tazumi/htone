@@ -11,4 +11,4 @@ let SV = [], LV, bad;
 try { SV = (localStorage.htone || '').split(','); bad = localStorage.htoneLoad; } catch {}
 LV = SV[0] ? +SV[0] : mob ? (mem > 7 ? 1 : 2) : mem <= 4 ? 2 : 0;
 if (bad && LV < 2) { SV = [++LV]; keep('htone', LV); }
-const THIN = 1 << LV, SHADOW = LV ? 2048 : 4096, AA = LV > 1 ? 1 : 4, RAYN = LV > 1 ? 4 : LV ? 6 : 8, NSNOW = 26000 >> LV, NDRIFT = 6000 >> LV;
+const THIN = 1 << LV, SHADOW = LV ? 2048 : 4096, AA = LV > 1 ? 1 : 4, RAYN = LV > 1 ? 4 : LV ? 6 : 8, NSNOW = 40000 >> LV, NDRIFT = 6000 >> LV;

@@ -7,8 +7,11 @@ const FH = 2.8, RAILZ = -185, RAILY = 2.5, ROADZ = -140;
 // the highway along ROADZ: NRC slots, each sends one vehicle now and then (period, offset in s); vehicle kinds 0-4 are
 // the cars, then a box truck, a tractor with a trailer, a motorhome and an old small bus: half length, speed in m/s
 const NRC = 8, ROADP = [113, 173, 241, 307, 151, 199, 263, 331], ROADO = [20, 95, 150, 60, 130, 10, 200, 75];
-const VEH = [[2.2, 17], [2.05, 16], [1.95, 17], [2.15, 18], [2.25, 16], [4, 13], [8.3, 12], [3.8, 14], [3.6, 12]];
-const vehKind = (h) => (h < 0.6 ? (h / 0.6 * 5) | 0 : h < 0.72 ? 5 : h < 0.84 ? 6 : h < 0.91 ? 7 : 8);
+// then a police van, a snow plough and a tractor with a blade (both slow, an orange beacon on the roof)
+const VEH = [[2.2, 17], [2.05, 16], [1.95, 17], [2.15, 18], [2.25, 16], [4, 13], [8.3, 12], [3.8, 14], [3.6, 12], [2.2, 15], [4.6, 7], [2.4, 6]];
+const vehKind = (h) => (h < 0.54 ? (h / 0.54 * 5) | 0 : h < 0.64 ? 5 : h < 0.74 ? 6 : h < 0.8 ? 7 : h < 0.86 ? 8 : h < 0.91 ? 9 : h < 0.96 ? 10 : 11);
+// the beacon on the roof of each kind: height, colour (0 none, 1 blue, 2 orange), place along the vehicle
+const VEHB = [[0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [2.14, 1, 0.15], [3.42, 2, 3.2], [2.84, 2, -0.95]];
 // the freight train: a locomotive, then the cars (kind, length); FRL is its whole length
 const FREIGHT = [[0, 18]]; { rseed(41); for (let k = 0; k < 26; k++) { const c = 1 + (rnd() * 4 | 0); FREIGHT.push([c, [0, 12.5, 15, 13.5, 14][c]]); } }
 const FRL = FREIGHT.reduce((a, c) => a + c[1], 0);
@@ -53,7 +56,9 @@ const TVU = RU + 1.22, TVY = RY + 1.72, TVZ = -0.78;
 const POLES = [[10.8, 10, PI, 0], [10.8, -22, PI, 0], [-4, -52.5, -PI / 2, 0], [22, -57, PI / 2, 0], [-13, -60, PI, 0], [57, -48, PI, 0],
   [46, 23.4, PI / 2, 0], [-44, 38, 0, 1], [-23, -96, 0, 1], [40, -90, PI / 2, 1], [80, -68, 0, 0], [78.5, 24, 0, 1]];
 const FLICK = 5; // this one is on its way out
-const NL = 32, LAMPS = POLES.map(([x, z, a, k], i) => { const [dx, dz] = rotY(1.6, 0, a); return { x: x + dx, y: 8.72, z: z + dz, r: 40, c: k ? [250, 128, 40] : [200, 224, 262], t: i }; });
+// the level crossing on the railway, east of the estate (x)
+const XING = 150;
+const NL = 40, LAMPS = POLES.map(([x, z, a, k], i) => { const [dx, dz] = rotY(1.6, 0, a); return { x: x + dx, y: 8.72, z: z + dz, r: 40, c: k ? [250, 128, 40] : [200, 224, 262], t: i }; });
 BLD.slice(0, 5).forEach((b) => { if (LAMPS.length < 24) for (let i = 0; i < b.sec && LAMPS.length < 24; i++) { const u = (i * b.T.front.length + b.T.front.indexOf('s') + 0.5) * b.T.bw, p = toW(b, 0, u, 2.32, 0.95); LAMPS.push({ x: p[0], y: p[1], z: p[2], r: 9, c: [13, 7.6, 3.4], t: -1 }); } });
 
 // shops: x, z, yaw (0: the shop front faces +z), kind (0 grocery, 1 chemist's, 2 / 3 the all-night kiosks), width, depth
@@ -419,16 +424,20 @@ function makeWorld() {
   // registers a mesh under a name; solid() places instances of it: 12 floats = pos + scale, quaternion, palette, seed, tex scale, animation
   const reg = (name, m, o = {}) => { const b = m.build(); b.name = name; b.noSh = o.noSh; id[name] = meshes.length; meshes.push(b); inst.push([]); return b; };
   const solid = (name, x, y, z, yaw = 0, pal = 0, seed = 0, ts = 1, an = 0, sc = 1) => { const q = qYaw(yaw); inst[id[name]].push(x, y, z, sc, q[0], q[1], q[2], q[3], pal, seed, ts, an); };
-  const wins = [], winB = [], boxes = [], rects = [], snd = []; // winB: building * 4 + wall of each pane; snd: sounds in the world [kind, x, y, z] // rects: footprints for the ground map [cx, cz, hx, hz, yaw, weight]
+  const wins = [], winB = [], boxes = [], rects = [], snd = [], thaw = [], bare = []; // bare: x0, z0, x1, z1 where no grass grows // winB: building * 4 + wall of each pane; snd: sounds in the world [kind, x, y, z] // rects: footprints for the ground map [cx, cz, hx, hz, yaw, weight]
   const blades = Array.from({ length: nCells }, () => []);
   const glare = [], steam = [], paper = [], decals = []; // decals: x, y, z, yaw, w, h, mode, glow, atlas cell
 
   for (const k in PROPS) reg(k, PROPS[k](), { noSh: k === 'wagon' || k === 'bulb' });
   for (const k in PROPS2) reg(k, PROPS2[k]());
+  // props4: the yard and street props; props5: vehicles, people and animals (walkers cast no baked shadow: they move)
+  for (const k in PROPS4) reg(k, PROPS4[k](), { noSh: ['bag'].includes(k) });
+  for (const k of ['uaz', 'ambulance', 'plow', 'tractor', 'walker', 'walkerW', 'janitor', 'courier', 'drunk', 'dog', 'dogLying', 'dogSmall', 'crow', 'bird', 'rowan', 'oldTree', 'tent', 'frameBld', 'watertower'])
+    reg(k, PROPS5[k](), { noSh: ['walker', 'walkerW', 'janitor', 'courier', 'drunk', 'dogSmall'].includes(k) });
   for (const k of ['truck', 'semi', 'rv', 'bus', 'loco', 'tank', 'box', 'gondola', 'flat', 'kiosk']) reg(k, PROPS3[k](), { noSh: ['loco', 'tank', 'box', 'gondola', 'flat'].includes(k) });
 CARS.forEach((c, t) => reg('car' + t, meshCar(t)));
   for (let k = 0; k < 4; k++) reg('tree' + k, meshTree(k, LV > 1));
-  reg('tree4', PROPS3.spruce(LV > 1));
+  reg('tree4', PROPS3.spruce(LV > 1)); reg('tree5', PROPS3.spruce(true)); // the second for the far forest
   reg('pav0', PROPS3.pavilion(14, 9)); reg('pav1', PROPS3.pavilion(10, 7));
   { const m = new Mesh().mat(M_BARK); m.bar([0, 0, 0], [0, 6, 0], 0.2); m.bar([0, 5.8, 0], [0, 5.75, 1.2], 0.07); reg('wpole', m); }
 
@@ -495,7 +504,7 @@ CARS.forEach((c, t) => reg('car' + t, meshCar(t)));
   BLD.slice(0, 2).forEach((b) => { for (let i = 0; i < b.sec; i++) { const u = (i * 7 + 3.5) * b.T.bw + 2.3, p = toW(b, 0, u, 0, 1.2); solid('bench', p[0], 0, p[2], p[3] - PI / 2, 8, u); } });
   const ly = lawnY(0);
   solid('slide', 15.5, ly, -4.5, -0.5); solid('swing', 20.5, ly, 3.2, 0.25, 5); for (const d of [-0.75, 0.75]) { const [dx, dz] = rotY(d, 0, 0.25); solid('seat', 20.5 + dx, ly, 3.2 + dz, 0.25, 14, d + 2, 1, 3); }
-  solid('carousel', 23, ly, -19, 0, 11); solid('mushroom', 13.8, ly, 5.5, 0.4, 15); solid('frame', 34, ly, 16, 0.2);
+  solid('carousel', 23, ly, -19, 0, 11, 0, 1, 8); solid('mushroom', 13.8, ly, 5.5, 0.4, 15); solid('frame', 34, ly, 16, 0.2);
   for (const x of [19, 25.5]) solid('tpole', x, ly, 11.5, PI / 2);
   solid('pen', -33.6, 0, 34.5, PI / 2); for (const z of [32.6, 34.4, 36.2]) solid('bin', -34.2, 0, z, PI / 2 + rr(-0.1, 0.1));
   boxes.push([-35.2, 31.8, -33, 37.2, 2]);
@@ -506,7 +515,7 @@ CARS.forEach((c, t) => reg('car' + t, meshCar(t)));
   for (const y of [24, 48, 72, 78]) glare.push(-78, y, -156, 0.55, 2.6, 0.12, 0.08, y === 78 ? 1 : 0);
   for (const y of [57.5, 40]) for (const a of [0, 2.1, 4.2]) glare.push(124 + 2.3 * cos(a), y, -124 + 2.3 * sin(a), 0.5, 2.4, 0.11, 0.07, y > 50 ? 1 : 0);
   for (let k = 0; k < 10; k++) solid('wagon', k * 23.6, RAILY, RAILZ, 0, 12, k, 1, 2);
-  glare.push(0, 0, 0, 2.6, 4, 3.6, 3, 50, 0, 0, 0, 2.6, 4, 3.6, 3, 51); for (let k = 0; k < NRC; k++) glare.push(0, 0, 0, 1.5, 0, 0, 0, 60 + k, 0, 0, 0, 0.9, 0, 0, 0, 70 + k);
+  glare.push(0, 0, 0, 2.6, 4, 3.6, 3, 50, 0, 0, 0, 2.6, 4, 3.6, 3, 51); for (let k = 0; k < NRC; k++) glare.push(0, 0, 0, 1.5, 0, 0, 0, 60 + k, 0, 0, 0, 0.9, 0, 0, 0, 70 + k, 0, 0, 0, 0.7, 0, 0, 0, 80 + k);
 
   // --- the viewer's kitchen: its mesh in the frame of house V, tiles, the picture on the television, a clock, steam over
   //     the cup and the kettle, the blue of the gas under it, the television's sound
@@ -594,9 +603,9 @@ CARS.forEach((c, t) => reg('car' + t, meshCar(t)));
 
   // --- the highway: every slot has one vehicle of each kind, the vertex shader shows the kind the slot sends now
   {
-    const VM = ['car0', 'car1', 'car2', 'car3', 'car4', 'truck', 'semi', 'rv', 'bus'];
+    const VM = ['car0', 'car1', 'car2', 'car3', 'car4', 'truck', 'semi', 'rv', 'bus', 'uaz', 'plow', 'tractor'];
     rseed(61);
-    for (let k = 0; k < NRC; k++) VM.forEach((nm, kind) => solid(nm, 0, 0, 0, 0, kind === 8 ? pick([14, 15]) : kind > 4 ? pick([1, 2, 5, 6, 7, 8, 10, 11, 13]) : pick([0, 1, 2, 3, 4, 5, 6, 7]), k, kind, 5));
+    for (let k = 0; k < NRC; k++) VM.forEach((nm, kind) => solid(nm, 0, 0, 0, 0, kind === 8 ? pick([14, 15]) : kind === 9 ? 10 : kind === 10 ? 15 : kind === 11 ? pick([11, 5]) : kind > 4 ? pick([1, 2, 5, 6, 7, 8, 10, 11, 13]) : pick([0, 1, 2, 3, 4, 5, 6, 7]), k, kind, 5));
     const m = new Mesh().mat(M_CONC);
     for (let x = -192; x < 192; x += 9) m.box(x, 0, ROADZ - 0.06, x + 4, 0.006, ROADZ + 0.06, 4, 1, 1);
     for (const z of [ROADZ - 3.6, ROADZ + 3.6]) m.box(-192, 0, z - 0.06, 192, 0.006, z + 0.06, 4, 1, 1);
@@ -638,6 +647,9 @@ CARS.forEach((c, t) => reg('car' + t, meshCar(t)));
     for (const [, , , bi, , uc] of DOORS) if (bi < 2) { const b = BLD[bi], p = toW(b, 0, uc + 2.3, 0, 2.2); solid('urn', p[0], 0, p[2]); }
   }
 
+  // --- the small things of the estate and round it, the walkways and paths from the doors (town.js)
+  town({ solid, reg, wins, winB, made, decals, glare, steam, snd, boxes, rects, grassY, thaw, bare });
+
   // --- cars
   rseed(5);
   for (const [x0, z0, dx, dz, n, yaw] of PARK) for (let k = 0; k < n; k++) {
@@ -673,7 +685,7 @@ CARS.forEach((c, t) => reg('car' + t, meshCar(t)));
     if (tall) for (let k = 0; k < 3; k++) leaf(x + rr(-0.1, 0.1), y, z + rr(-0.1, 0.1), rr(0.45, 1.15), rr(0, TAU), rr(0.03, 0.3), rr(0.014, 0.022), 0, 1, rnd(), rnd(), rr(0.3, 0.6)); // weeds
     else for (let k = 0; k < 3; k++) leaf(x + rr(-0.06, 0.06), y, z + rr(-0.06, 0.06), rr(0.09, 0.26) * (0.6 + n), rr(0, TAU), rr(0.15, 0.9), rr(0.012, 0.02), rnd(), 0, rnd(), rnd(), rr(0.3, 0.9));
   };
-  const sow = (x0, z0, x1, z1, dens) => { for (let n = (x1 - x0) * (z1 - z0) * dens / THIN | 0; n--;) { const x = rr(x0, x1), z = rr(z0, z1), y = grassY(x, z); if (y < 0 || inBld(x, z) || wear(x, z) < 0.6) continue; tuft(x, z, y); } };
+  const sow = (x0, z0, x1, z1, dens) => { for (let n = (x1 - x0) * (z1 - z0) * dens / THIN | 0; n--;) { const x = rr(x0, x1), z = rr(z0, z1), y = grassY(x, z); if (y < 0 || inBld(x, z) || wear(x, z) < 0.6 || bare.some((b) => x > b[0] && x < b[2] && z > b[1] && z < b[3])) continue; tuft(x, z, y); } };
   sow(-40, -128, 86, 54, 5.5); // dense around the yard
   sow(-110, -128, -40, 100, 1.2); sow(86, -128, 140, 100, 1.2); sow(-40, 54, 86, 110, 1.2); sow(-110, -178, 140, -146, 0.8);
   for (const [x, z, r] of BUSH) { if (nearDoor(x, z)) continue; const y = max(grassY(x, z), 0); for (let k = 0; k < 150 / THIN; k++) { const a = rr(0, TAU), d = rr(0, 0.3) * r; leaf(x + cos(a) * d, y, z + sin(a) * d, rr(0.7, 1.7) * r, a + rr(-0.5, 0.5), rr(0.1, 0.95), rr(0.012, 0.02), 0, 2, rnd(), rnd(), rr(0.35, 0.6)); } }
@@ -705,7 +717,8 @@ CARS.forEach((c, t) => reg('car' + t, meshCar(t)));
   for (let j = 0; j < 512; j++) for (let i = 0; i < 512; i++) {
     const x = (i + 0.5) * 0.75 + OX, z = (j + 0.5) * 0.75 + OZ, o = (i + 512 * j) * 4, oc = occ[i + 512 * j];
     gm[o] = (1 - 0.8 * sstep(0, 0.7, oc)) * 255;
-    gm[o + 1] = clamp(sstep(0.36, 0.62, fbm(x * 0.045, 1, z * 0.045, 3) * 0.7 + fbm(x * 0.21, 5, z * 0.21, 2) * 0.3) * (1 - sstep(0.05, 0.45, oc)), 0, 1) * 255;
+    let melt = 1; for (const [tx, tz, tr] of thaw) melt = min(melt, sstep(tr * 0.7, tr * 1.3, hypot(x - tx, z - tz)));
+    gm[o + 1] = clamp(sstep(0.36, 0.62, fbm(x * 0.045, 1, z * 0.045, 3) * 0.7 + fbm(x * 0.21, 5, z * 0.21, 2) * 0.3) * (1 - sstep(0.05, 0.45, oc)) * melt, 0, 1) * 255;
     gm[o + 2] = (1 - sstep(0.5, 1.8, wear(x, z))) * 255;
     gm[o + 3] = sstep(0.5, 0.68, fbm(x * 0.07 + 9, 2, z * 0.07, 3)) * 255;
   }
