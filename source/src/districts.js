@@ -10,21 +10,25 @@
 
 // the streets: asphalt over the lawns, [x0, z0, x1, z1]
 const STREETS = [
-  [-256, -134, -244, 130], [-400, -66, -256, -54], [-400, 24, -256, 36], [-505, -134, -395, -104], // west, the cafe's lot
+  [-256, -134, -244, 130], [-520, -66, -256, -54], [-520, 24, -256, 36], [-505, -134, -395, -104], // west, the cafe's lot
   [254, -134, 266, 160], [266, -66, 520, -54], [266, 54, 520, 66], [266, -54, 394, 54], [415, 66, 485, 104], [300, -79, 340, -66], [448, -83, 488, -66], [296, 66, 344, 72], // the centre
-  [116, 280, 128, 576], [-235, 294, 420, 306], [128, 395, 330, 407], [160, 370, 310, 382], [160, 426, 310, 438], // south of the river
+  [116, 280, 128, 576], [-235, 294, 420, 306], [128, 395, 400, 407], [160, 370, 400, 382], [160, 426, 400, 438], [128, 495, 330, 507], // south of the river
+  [186, 88, 212, 100], [200, 50, 212, 88], [212, 50, 254, 62], // from the foot of the bridge's north ramp to the avenue
 ];
+// the bridge's north end turns east and comes down to the ground on a ramp: x0, z0, x1, z1 (the corner over the bridge's end
+// and the ramp itself); nothing grows on them
+const RAMPN = [116, 88, 186, 100];
 const ST_Y = 0.215; // the top of the streets
 const onStreet = (x, z, m = 0) => STREETS.some((s) => x > s[0] - m && x < s[2] + m && z > s[1] - m && z < s[3] + m);
 // where the forest does not grow: the districts, the park, the roads, the river and the railway
-const NOFOREST = [[-412, -140, -236, 140], [-512, -140, -388, -95], [200, -140, 500, 168], [-242, 286, 72, 492], [126, 286, 348, 482], [108, 212, 136, 576], [-242, 288, 425, 312]];
+const NOFOREST = [[-525, -140, -236, 140], [-512, -140, -388, -95], [200, -140, 500, 168], [-242, 286, 72, 492], [72, 316, 112, 480], [126, 286, 408, 482], [126, 482, 336, 545], [108, 212, 136, 576], [-242, 288, 425, 312]];
 // the park's lake: centre and radii
 const LAKE = [-90, 395, 80, 50];
 // the alleys of the park (polylines): from the gate to the lake, round the lake, to the wheel and to the bandstand
 const ALLEYS = [[[-20, 312], [-28, 330], [-45, 345]], [...Array(49).keys()].map((k) => [LAKE[0] + cos(k / 48 * TAU) * (LAKE[2] + 11), LAKE[1] + sin(k / 48 * TAU) * (LAKE[3] + 11)]),
   [[-2, 386], [14, 412], [22, 430]], [[-181, 380], [-198, 380]], [[-20, 312], [10, 322], [40, 338], [60, 360]]];
 // where people of the district houses go (town.js leads the paths to the nearest of these)
-HUBS.push([-258, 70], [-258, 0], [-262, -60], [-262, 30], [-300, -60], [-450, -104], [262, 0], [262, 100], [320, -60], [320, 66], [250, 401], [130, 401], [234, 404], [-20, 306]);
+HUBS.push([-460, -60], [-460, 30], [-415, -62], [400, -62], [430, 0], [378, 66], [395, 145], [240, -60], [360, 401], [110, 360], [110, 440], [230, 500], [-258, 70], [-258, 0], [-262, -60], [-262, 30], [-300, -60], [-450, -104], [262, 0], [262, 100], [320, -60], [320, 66], [250, 401], [130, 401], [234, 404], [-20, 306]);
 
 // lamps: a pole of the estate's kind (0 cold, 1 sodium), an LED pole (2), a park globe (3); each records its lamp index
 const DPOLES = [];
@@ -41,7 +45,11 @@ for (const x of [300, 345, 390, 435, 480]) { dpole(x, -53, PI / 2, 2); dpole(x, 
 for (const [x, z] of [[279, -45], [371, -45], [279, 45], [371, 45]]) dpole(x, z, 0, 3);
 for (let z = 300; z <= 560; z += 40) dpole(129.5, z, PI, 2);
 for (let x = -215; x <= 400; x += 52) if (abs(x - 122) > 12) dpole(x, 307.5, -PI / 2, 2);
-for (const [x, z] of [[170, 383], [230, 383], [290, 383], [170, 425], [230, 425], [290, 425]]) dpole(x, z, PI / 2, 2);
+for (const [x, z] of [[170, 383], [230, 383], [290, 383], [350, 383], [170, 425], [230, 425], [290, 425], [350, 425]]) dpole(x, z, PI / 2, 2);
+for (const x of [160, 230, 300]) dpole(x, 508.5, PI / 2, 2);
+for (const x of [-440, -490]) { dpole(x, -53, PI / 2, 1); dpole(x, 37, PI / 2, 1); }
+for (const x of [140, 182]) dpole(x, 101.5, PI / 2, 2);
+for (const [x, z, a] of [[213.5, 70, PI], [225, 63.5, PI / 2], [245, 63.5, PI / 2]]) dpole(x, z, a, 2);
 { // park globes along the alleys, every 24 m or so
   for (const A of ALLEYS) { let acc = 12; for (let k = 0; k < A.length - 1; k++) { const [a, b] = [A[k], A[k + 1]], L = hypot(b[0] - a[0], b[1] - a[1]); for (let s = acc; s < L; s += 24) { const t = s / L, nx = -(b[1] - a[1]) / L, nz = (b[0] - a[0]) / L; dpole(mix(a[0], b[0], t) + nx * 2.2, mix(a[1], b[1], t) + nz * 2.2, 0, 3); acc = s + 24 - L; } if (acc >= L) acc -= L; } }
 }
@@ -101,8 +109,16 @@ function districts(o) {
     // the ramp down from the bridge to the road south
     m.mat(M_ASPH); m.q4([116.45, 7, 220], [127.55, 7, 220], [127.55, ST_Y, 282], [116.45, ST_Y, 282]);
     m.mat(M_CONC); for (const s of [-1, 1]) { const x = 122 + s * 5.75; m.q4([x, 0, 220], [x, 0, 282], [x, ST_Y + 0.9, 282], [x, 7.9, 220], [0.6, 0.6, 1, 1]); }
+    // the corner at the bridge's north end, on a pier, and the ramp east from it down to the street
+    m.mat(M_CONC); m.box(116.3, 5.8, 88, 128, 6.95, 100, 32, 0.55, 0.9); m.box(120.2, 0, 92.2, 123.8, 5.8, 95.8, 0, 0.5, 0.8);
+    m.box(116.3, 6.95, 88, 116.7, 8, 100, 0, 0.8, 1); m.box(116.3, 6.95, 88, 128, 8, 88.4, 0, 0.8, 1);
+    m.mat(M_ASPH); m.box(116.7, 6.95, 88.4, 128, 7, 100, 4 | 16 | 32, 1, 1);
+    m.q4([128, 7, 99.55], [128, 7, 88.45], [186, ST_Y, 88.45], [186, ST_Y, 99.55]);
+    m.mat(M_CONC); for (const z of [88.2, 99.8]) m.q4([128, 0, z], [186, 0, z], [186, ST_Y + 0.9, z], [128, 7.9, z], [0.6, 0.6, 1, 1]);
+    m.q4([128, 0, 88.2], [128, 0, 99.8], [128, 5.8, 99.8], [128, 5.8, 88.2], 0.6);
     reg('streets', m); solid('streets', 0, 0, 0);
-    boxes.push([115.8, 220, 116.6, 282, 8], [127.4, 220, 128.2, 282, 8]);
+    boxes.push([115.8, 220, 116.6, 282, 8], [127.4, 220, 128.2, 282, 8], [128, 87.8, 186, 88.6, 8], [128, 99.4, 186, 100.2, 8], [115.9, 88, 116.7, 100, 8]);
+    bare.push([RAMPN[0] - 1, RAMPN[1] - 1, RAMPN[2] + 1, RAMPN[3] + 1]);
   }
 
   // ---------------------------------------------------------------- the old quarter: sheds, woodpiles, lindens, the bakery
@@ -257,15 +273,15 @@ function districts(o) {
   // a playground, the cars of people with money
   rseed(114);
   {
-    for (const [bi, side] of [[24, 0], [25, 0], [26, 0], [27, 0]]) {
-      const b = BLD[bi], sh = [[5, 'shopWin', 'signMarket'], [6.5, 'pharmWin', 'signCoffee'], [5, 'shopWin', 'signFlowers'], [6.5, 'pharmWin', 'signMarket']][bi - 24];
+    BLD.forEach((b, bi) => { if (b.t !== 4) return;
+      const side = 0, sh = [[5, 'shopWin', 'signMarket'], [6.5, 'pharmWin', 'signCoffee'], [5, 'shopWin', 'signFlowers'], [6.5, 'pharmWin', 'signMarket']][bi % 4];
       const u = b.L - 7.6, w = 7.4; const p = toW(b, side, u, 2.5, 0.06), q = toW(b, side, u, 4.6, 0.07);
       decals.push(p[0], p[1], p[2], p[3], w, 2.4, 1, 1.1, sh[1], q[0], q[1], q[2], q[3], 4.2, 0.8, 2, 2.8, sh[2]);
-    }
+    });
     put('playset', 234, 404, 0.2, 0, 0, [2.6, 3, 3.8]); put('sandbox', 222, 412, 0.1); put('swing', 248, 410, 0.2, 5);
     for (const [x, z, a] of [[214, 400, PI / 2], [256, 398, -PI / 2], [234, 416, PI]]) put('bench', x, z, a, 8, x);
     // the cars: crossovers, a sports car, an electric one glowing blue under its sill
-    for (const zz of [376, 432]) for (let k = 0; k < 18; k++) { if (rnd() < 0.2) continue; const x = 164 + k * 8.2, t = pick([6, 6, 6, 8, 8, 3, 7, 0]); car(t, x, zz, zz < 400 ? PI / 2 : -PI / 2, pick([0, 1, 2, 3, 5, 10, 11, 13, 14])); if (t === 8 && rnd() < 0.5) glare.push(x, ST_Y + 0.15, zz, 0.6, 0.1, 0.4, 1.4, 0); }
+    for (const zz of [376, 432]) for (let k = 0; k < 28; k++) { if (rnd() < 0.2) continue; const x = 164 + k * 8.2, t = pick([6, 6, 6, 8, 8, 3, 7, 0]); car(t, x, zz, zz < 400 ? PI / 2 : -PI / 2, pick([0, 1, 2, 3, 5, 10, 11, 13, 14])); if (t === 8 && rnd() < 0.5) glare.push(x, ST_Y + 0.15, zz, 0.6, 0.1, 0.4, 1.4, 0); }
     solid('walkerW', 160, ST_Y, 401, PI / 2, 15, 0.5, 150 + 1.0 / 10, 7); solid('dogSmall', 160.6, ST_Y, 401, PI / 2, 6, 0.5, 150 + 1.0 / 10, 7);
   }
 
@@ -274,9 +290,55 @@ function districts(o) {
   rseed(116);
   for (let k = 0; k < o.winB.length; k++) {
     const bi = o.winB[k] >> 2, ty = wins[k * 8 + 7]; if (bi < 13 || ty > 1) continue;
-    const r = rnd(), old = bi < 22;
+    const r = rnd(), old = BLD[bi].t === 3;
     if (r < (old ? 0.24 : 0.15)) wins[k * 8 + 7] = 12 * 4 + ty;
     else if (ty === 0 && r < (old ? 0.262 : 0.158)) { const f = pick([1, 2, 3, 4, 5]); wins[k * 8 + 7] = f * 4; if (f < 4 && old && rnd() < 0.5) snd.push([['radio', 'cook', 'tv'][f - 1], wins[k * 8], wins[k * 8 + 1], wins[k * 8 + 2]]); }
+  }
+
+  // ---------------------------------------------------------------- people: walking the streets and the alleys, by the doors,
+  // on the square and the benches, skating on the lake; solid() in world.js makes those standing about sway, look round and
+  // breathe out into the frost
+  rseed(117);
+  {
+    // somebody walking to and fro between two points (anim 7: tex scale = path length + speed / 10)
+    const walk = (nm, x0, z0, x1, z1, v, pal, y) => { const L = hypot(x1 - x0, z1 - z0); solid(nm, x0, y ?? gy(x0, z0), z0, atan2(x1 - x0, z1 - z0), pal, rnd(), floor(L) + v / 10, 7); };
+    const coat = () => pick([0, 1, 2, 4, 5, 6, 7, 8, 9, 10, 11, 13, 14]);
+    // along the streets, near one edge or the other
+    for (const [x0, z0, x1, z1] of STREETS) {
+      const w = x1 - x0, d = z1 - z0, L = max(w, d), along = w > d;
+      if (L < 45 || min(w, d) > 20) continue;
+      for (let k = 0, n = 1 + floor(L / 40); k < n; k++) {
+        const e = rnd() < 0.5 ? 0.9 : min(w, d) - 0.9, a = rr(4, L - 30), b = min(L - 4, a + rr(25, 80)), nm = rnd() < 0.5 ? 'walker' : 'walkerW', v = rr(0.9, 1.35), pal = coat();
+        const P = (t, o = 0) => (along ? [x0 + t, z0 + e + o] : [x0 + e + o, z0 + t]), [ax, az] = P(a), [bx, bz] = P(b);
+        if (rnd() < 0.5) walk(nm, ax, az, bx, bz, v, pal); else walk(nm, bx, bz, ax, az, v, pal);
+        if (nm === 'walker' && rnd() < 0.2) { const [cx, cz] = P(a, e < 1 ? 0.6 : -0.6), [dx, dz] = P(b, e < 1 ? 0.6 : -0.6); walk('dogSmall', cx, cz, dx, dz, v, pick([6, 8, 9])); }
+      }
+    }
+    // in the park: along the straight alleys and round the lake; skaters on the ice
+    for (const A of [ALLEYS[0], ALLEYS[4], ALLEYS[2]]) for (let k = 0; k < A.length - 1; k++) if (rnd() < 0.7) walk(pick(['walker', 'walkerW']), A[k][0], A[k][1], A[k + 1][0], A[k + 1][1], rr(0.8, 1.1), coat());
+    for (const k of [2, 14, 27, 38]) { const R = ALLEYS[1]; walk(pick(['walker', 'walkerW']), R[k][0], R[k][1], R[k + 3][0], R[k + 3][1], rr(0.8, 1.1), coat()); }
+    { const [lx, lz] = LAKE, y = gy(lx, lz) + 0.03; for (const [x0, z0, x1, z1, v] of [[-125, 372, -95, 380, 1.6], [-120, 360, -128, 384, 1.3], [-100, 400, -70, 392, 1.8]]) walk(rnd() < 0.5 ? 'walkerW' : 'walker', x0, z0, x1, z1, v, coat(), y); }
+    // by the doors of the district houses: somebody out for a smoke, two neighbours talking, a woman with her phone
+    for (const [x, z, a, bi] of DOORS) {
+      if (bi < 13) continue; const r = rnd(), s = rnd() < 0.5 ? -1 : 1;
+      if (r < 0.22) { const [px, pz] = loc(x, z, a, s * 2.3, 1.1), nm = pick(['smoker', 'standing', 'standing', 'girl']); put(nm, px, pz, a + rr(-0.8, 0.8), coat());
+        if (nm === 'smoker') { const S = R6('smoker'), e = at(px, pz, a, S.ember); glare.push(e[0], gy(px, pz) + e[1], e[2], 0.07, 3.2, 0.8, 0.15, 2); } }
+      else if (r < 0.32) { const [px, pz] = loc(x, z, a, s * 2.6, 2.2); put('talkers', px, pz, a + PI / 2 + rr(-0.4, 0.4), coat()); snd.push(['chat', px, 1.6, pz]); }
+    }
+    // grandmothers on the benches of the old courtyards, men by the kiosk with their beer
+    for (const [cx, cz] of [[-320, -15], [-320, 80]]) for (const [dx, k] of [[16, 0], [-18, 1]]) if (rnd() < 0.8) { const [px, pz] = loc(cx + dx, cz + 8, PI, (k ? -1 : 1) * 0.4, 0); put('seated', px, pz, PI, pick([2, 6, 9, 14]), rnd()); if (!k) snd.push(['chat', px, 1.2, pz]); }
+    put('standing', -258.6, 1.8, PI / 2 + 0.5, 8); put('standing', -258.4, -1.6, PI / 2 - 0.4, 2); snd.push(['chat', -258.5, 1.6, 0]);
+    // the square: people round the tree and the monument, a family, two talking by the benches
+    for (const [x, z, a, nm] of [[305, -20, -2.2, 'girl'], [308, -33, 2.6, 'talkers'], [295, -17, 0.4, 'standing'], [296, -16, 0.9, 'walkerW'], [338, 8, -2, 'talkers'], [340, -12, 1.3, 'standing'], [285, 35, 3.6, 'talkers'], [360, 30, 2, 'girl'], [322, 4, -1.4, 'standing'], [323, 5.2, -2.1, 'walkerW'], [355, -30, 0.7, 'talkers'], [312, 22, 2.2, 'smoker'], [348, 16, -0.6, 'girl'], [290, -38, 1.9, 'standing'], [291, -39.4, 0.2, 'walker']]) {
+      put(nm, x, z, a, coat()); if (nm === 'talkers') snd.push(['chat', x, 1.6, z]);
+    }
+    walk('walker', 282, -40, 282, 40, 1.1, coat()); walk('walkerW', 368, 38, 300, 38, 1.0, coat()); walk('walkerW', 300, -40, 360, -2, 1.05, coat()); walk('walker', 365, -36, 310, 30, 1.2, coat()); walk('walker', 330, -40, 330, -14, 0.95, coat());
+    // the police, the firemen at their open bay, somebody smoking at the hospital door, a queue at the cafe door
+    put('standing', 316, -76.6, 0.3, 10); put('standing', 324.5, -76.4, -0.4, 10);
+    put('standing', 485, -82, -2.2, 15); put('standing', 483.6, -80.7, 0.9, 15); snd.push(['chat', 484.5, 1.6, -81.5]);
+    { const S = R6('smoker'), [px, pz, pa] = [458, 107.5, 2.8]; put('smoker', px, pz, pa, 13); const e = at(px, pz, pa, S.ember); glare.push(e[0], gy(px, pz) + e[1], e[2], 0.07, 3.2, 0.8, 0.15, 2); }
+    // at the shops under the towers
+    BLD.forEach((b) => { if (b.t !== 4) return; const p = toW(b, 0, b.L - 7.6 + rr(-2, 2), 0, rr(1.6, 2.6)); put(pick(['girl', 'standing', 'walkerW']), p[0], p[2], p[3] + rr(-1.2, 1.2), coat()); if (rnd() < 0.6) { const q = toW(b, 0, b.L - 12, 0, 3); put('talkers', q[0], q[2], p[3] + PI / 2, coat()); snd.push(['chat', q[0], 1.6, q[2]]); } });
   }
 
   // ---------------------------------------------------------------- the lamps placed above

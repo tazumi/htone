@@ -121,13 +121,22 @@ const S_B = S_G + /*wgsl*/`
 @group(0) @binding(8) var tA: texture_2d<f32>;
 fn fog(c: vec3f, wp: vec3f) -> vec3f { let v = wp - g.cam.xyz; let d = length(v); let T = exp(-SIG * d); return c * T + fogc(v / d) * (1. - T); }
 fn qrot(q: vec4f, v: vec3f) -> vec3f { return v + 2. * cross(q.xyz, cross(q.xyz, v) + q.w * v); }
-// the viewer's room: lamp light gets in only through the window (d: vector to the lamp)
-fn inroom(p: vec3f) -> bool { return all(p > ${v3([ROOM[0] - 0.1, ROOM[1] - 0.1, WINB[2]])}) && all(p < ${v3([ROOM[3] + 0.1, ROOM[4] + 0.1, ROOM[5] + 0.1])}); }
-fn through(p: vec3f, d: vec3f) -> f32 {
-  if (d.z > -.01) { return 0.; }
-  let h = p + d * ((${fl(WINB[2])} - p.z) / d.z);
-  let e = min(h.xy - vec2f(${WINB.slice(0, 2).map(fl).join(',')}), vec2f(${WINB.slice(3, 5).map(fl).join(',')}) - h.xy);
-  return ss(-.02, .04, min(e.x, e.y));
+// the viewer's flat: lamp light from outside gets into a room only through its own window (d: vector to the lamp)
+fn inroom(p: vec3f) -> bool { return all(p > ${v3([APTB[0] - 0.1, APTB[1] - 0.1, WINB[2]])}) && all(p < ${v3([APTB[3] + 0.1, APTB[4] + 0.1, APTB[5] + 0.1])}); }
+// which room of the flat p is in (APT in world.js), -1 in none
+fn rid(p: vec3f) -> i32 {
+  var R = array<vec4f, ${APT.length}>(${AFREE.slice(0, APT.length).map((b) => `vec4f(${[b[0] - 0.07, b[2] - 0.07, b[3] + 0.07, b[5] + 0.07].map(fl).join(',')})`).join(', ')});
+  for (var k = 0; k < ${APT.length}; k++) { let r = R[k]; if (p.x > r.x && p.x < r.z && p.z > r.y && p.z < r.w) { return k; } }
+  return -1;
+}
+fn through(p: vec3f, d: vec3f, r: i32) -> f32 {
+  ${(() => {
+    // the kitchen's, the living room's on the yard side, the bedroom's at the back: room, plane z, x0 y0 x1 y1
+    const W = [[0, WINB[2], WINB]].concat(AWIN.map(([s, u], j) => { const b = s ? boxW(u - 0.725, RY + 0.95, -11.6, u + 0.725, RY + 2.45, -11.5) : boxW(u - 0.725, RY + 0.95, -0.3, u + 0.725, RY + 2.45, -0.1); return [j ? 4 : 1, s ? b[5] : b[2], b]; }));
+    return W.map(([r, z, b]) => `if (r == ${r}) { if (abs(d.z) < .01) { return 0.; } let s = (${fl(z)} - p.z) / d.z; if (s < 0.) { return 0.; }
+    let h = p.xy + d.xy * s; let e = min(h - vec2f(${fl(b[0])}, ${fl(b[1])}), vec2f(${fl(b[3])}, ${fl(b[4])}) - h); return ss(-.02, .04, min(e.x, e.y)); }`).join(' ');
+  })()}
+  return 0.;
 }
 // where p falls in lamp L's tile of the shadow atlas: uv, depth, 1 when it is inside the tile
 fn lsuv(L: Lamp, p: vec3f) -> vec4f {
@@ -156,15 +165,17 @@ fn gmap(p: vec2f) -> vec4f {
 struct LT { d: vec3f, s: vec3f };
 fn lit(p: vec3f, n: vec3f, V: vec3f, gl: f32) -> LT {
   var o: LT; o.d = vec3f(0.); o.s = vec3f(0.);
-  let ns = exp2(gl * 10.); let rm = inroom(p);
-  for (var k = 0; k < 8; k++) {
-    let id = lid(p, k); if (id > 253u) { break; }
+  let ns = exp2(gl * 10.); let rm = inroom(p); let ri = select(-1, rid(p), rm);
+  // the lamps of the grid, then in the flat its own lights (tag -2 - room: each lights only its room); those outside get
+  // into the flat only through the window of the room
+  for (var k = 0; k < 8 + select(0, ${ALAMP.length + 1}, rm); k++) {
+    var id = 0u;
+    if (k < 8) { id = lid(p, k); if (id > 253u) { k = 7; continue; } } else { id = u32(${TVL} + select(0, ${AL0 - TVL - 1}, k > 8) + k - 8); }
     let L = g.lamp[id]; let d = L.p.xyz - p; let r2 = dot(d, d); let w = sat(1. - r2 / (L.p.w * L.p.w));
-    // a light in the viewer's room (tag -2) lights only the room, the others get into it only through the window
-    if (w <= 0. || (L.c.w < -1.5 && !rm)) { continue; }
+    if (w <= 0. || (k >= 8 && f32(ri) != -2. - L.c.w)) { continue; }
     let l = d * inverseSqrt(r2);
-    var E = L.c.rgb * (w * w / (r2 + 1.) * lcone(L, l) * lsh4(L, p + n * .07));
-    if (rm && L.c.w > -1.5) { E *= through(p, d); }
+    var E = L.c.rgb * (w * w / (r2 + 1.) * lcone(L, l) * select(1., lsh4(L, p + n * .07), k < 8));
+    if (rm && k < 8) { E *= through(p, d, ri); }
     let ndl = sat(dot(n, l));
     o.d += E * ndl;
     let h = normalize(l + V); let fr = .04 + .96 * pow(1. - sat(dot(h, V)), 5.);
@@ -174,12 +185,13 @@ fn lit(p: vec3f, n: vec3f, V: vec3f, gl: f32) -> LT {
 }
 // lamp light arriving at a point in the air (snow, steam, grass tips)
 fn glow(p: vec3f) -> vec3f {
-  var o = vec3f(0.);
-  for (var k = 0; k < 8; k++) {
-    let id = lid(p, k); if (id > 253u) { break; }
+  var o = vec3f(0.); let ri = select(-1, rid(p), inroom(p));
+  for (var k = 0; k < 8 + select(0, ${ALAMP.length + 1}, ri >= 0); k++) {
+    var id = 0u;
+    if (k < 8) { id = lid(p, k); if (id > 253u) { k = 7; continue; } } else { id = u32(${TVL} + select(0, ${AL0 - TVL - 1}, k > 8) + k - 8); }
     let L = g.lamp[id]; let d = L.p.xyz - p; let r2 = dot(d, d); let w = sat(1. - r2 / (L.p.w * L.p.w));
-    if (w <= 0.) { continue; }
-    o += L.c.rgb * (w * w / (r2 + 1.) * lcone(L, d * inverseSqrt(r2)) * lsh(L, p));
+    if (w <= 0. || (k >= 8 && f32(ri) != -2. - L.c.w)) { continue; }
+    o += L.c.rgb * (w * w / (r2 + 1.) * lcone(L, d * inverseSqrt(r2)) * select(1., lsh(L, p), k < 8));
   }
   return o;
 }
@@ -212,6 +224,27 @@ struct VO { @builtin(position) cp: vec4f, @location(0) wp: vec3f, @location(1) n
     if (v < 3. && p.y < .45 && abs(p.z) < .3 && live) { let a = .42 * sin(t * v * 4.4 + select(0., 3.1416, p.x > 0.)); let q = p.yz - vec2f(.5, 0.); p = vec3f(p.x, .5 + q.x * cos(a) - q.y * sin(a), q.x * sin(a) + q.y * cos(a)); }
     if (back) { p = vec3f(0. - p.x, p.y, 0. - p.z); nl = vec3f(0. - nl.x, nl.y, 0. - nl.z); }
     p.z += L * select(u * 2., 2. - u * 2., back) * f32(live);
+  }
+  if (an == 12 && live) {
+    // somebody standing about: the weight goes from foot to foot, the chest rises with the breath, the head turns to look
+    // round now and then. Tex scale = the neck's height, + 10 for the two talkers (at z -.5 and +.5, face to face), who
+    // take turns: the one talking nods along and the man waves his raised hand
+    let pair = i.c.z > 5.; let nk = (i.c.z - select(0., 10., pair)) * i.a.w; let ph = fract(i.c.y) * 40.;
+    let who = select(1., sign(p.z), pair); let pz = select(0., who * .5, pair); let ph2 = ph + who * 1.7;
+    let talk = select(0., ss(.1, .5, sin(t * .37 + ph) * who), pair);
+    let h = max(p.y, 0.);
+    p.x += (.02 * sin(t * .5 + ph2) + .007 * sin(t * 1.3 + ph2 * 2.)) * h;
+    p.y *= 1. + .005 * sin(t * 1.9 + ph2);
+    if (p.y > nk) {
+      let ya = .5 * sin(t * .21 + ph2 * 3.) * ss(.2, .8, sin(t * .13 + ph2)) * (1. - talk);
+      var q = vec3f(p.x, p.y - nk, p.z - pz); q = vec3f(q.x * cos(ya) + q.z * sin(ya), q.y, q.z * cos(ya) - q.x * sin(ya));
+      q.z -= who * q.y * .25 * talk * max(sin(t * 5.3 + ph2), 0.);
+      p = vec3f(q.x, q.y + nk, q.z + pz);
+    }
+    if (pair && who < 0. && p.x > .2 && p.y > .9) {
+      let a = talk * .3 * sin(t * 3.1 + ph); let q = p.yz - vec2f(1.42, -.5);
+      p = vec3f(p.x, 1.42 + q.x * cos(a) - q.y * sin(a), -.5 + q.x * sin(a) + q.y * cos(a));
+    }
   }
   if (an == 8 && live) {
     // the roundabout: pushed round a little by the wind and left to drift back
@@ -324,8 +357,26 @@ fn pal(i: f32) -> vec3f {
       let thick = ss(.75, .35, i.ao) * f32(abs(i.m.x - 1.) < .1 && i.m.w > .5);
       alb = mix(alb, mix(vec3f(.5, .5, .47), vec3f(.03), ss(.6, .7, wB.a * .6 + wS.a * .5)), thick);
       gl = .12; bump = .6; ao = select(ao, 1., i.m.w > .5); snowK = .8;
+      if (sd < -9.5 && flt) {
+        // the parquet of the flat (its rooms have seeds -10 and below): oak strips laid in rows, each its own tone
+        let q = i.op.xz; let row = floor(q.y / .075); let qx = q.x / .42 + hs(row * 1.7); let fy = fract(q.y / .075); let fx = fract(qx);
+        let seam = 1. - ss(.0, .06, min(min(fy, 1. - fy), min(fx, 1. - fx) * .18));
+        alb = mix(vec3f(.085, .045, .022), vec3f(.15, .085, .04), hs(row * 3.7 + floor(qx) * 1.3)) * (.8 + .35 * wS.b) * (1. - .55 * seam);
+        gl = .55; bump = .04; snowK = 0.;
+      }
     }
-    case 7 { alb = pal(i.m.x) * (.65 + .5 * wA.b) * (.8 + .3 * wB.b); gl = .3; }
+    case 7 {
+      alb = pal(i.m.x) * (.65 + .5 * wA.b) * (.8 + .3 * wB.b); gl = .3;
+      if (sd < -9.5) {
+        // the rooms of the flat (seed -10 - pattern): wallpaper with stripes, small flowers or a damask, or tiles
+        let k = -10. - sd; let q = select(wu, i.op.xz, flt); var pt = 0.;
+        if (k < .5) { pt = ss(.36, .42, abs(fract(q.x * 5.) - .5)) + .5 * ss(.1, .06, abs(fract(q.x * 5.) - .5)); }
+        else if (k < 1.5) { let c1 = fract(q * 4.) - .5; let c2 = fract(q * 4. + .5) - .5; pt = 1. - ss(.04, .1, min(length(c1), length(c2) * 1.3)); }
+        else if (k < 2.5) { let d = min(abs(fract((q.x + q.y) * 2.6) - .5), abs(fract((q.x - q.y) * 2.6) - .5)); let c = fract(q * 2.6) - .5; pt = (1. - ss(.02, .05, d)) * .7 + (1. - ss(.05, .09, length(c))); }
+        else { let f = fract(q / .15); pt = 1. - ss(.0, .05, min(min(f.x, 1. - f.x), min(f.y, 1. - f.y))); }
+        alb = pal(i.m.x) * (.92 + .16 * wA.b) * mix(1., select(.62, .45, k > 2.5), pt); gl = select(.12, mix(.85, .15, pt), k > 2.5); bump = .03; snowK = 0.;
+      }
+    }
     case 8 {
       // things that shine: lamp heads (in step with their lamp), the bulbs over the doors, the windows of the train
       alb = vec3f(.02); snowK = 0.;
@@ -336,7 +387,7 @@ fn pal(i: f32) -> vec3f {
       else { let L = g.lamp[u32(sd + .5)]; emi = L.c.rgb * select(.09, 1.1, L.c.w < 0.); }
     }
     case 9 { alb = mix(vec3f(.16, .165, .17), vec3f(.10, .055, .03), ss(.55, .8, wS.a) * .7) * (.6 + .6 * wA.b); gl = .45; }
-    case 10 { alb = vec3f(.30, .30, .28) * (.7 + .4 * wA.b) * (.8 + .3 * wB.b) * mix(1., .65, ss(.55, .8, wS.a)); gl = .1; }
+    case 10 { alb = select(vec3f(.30, .30, .28) * (.7 + .4 * wA.b) * (.8 + .3 * wB.b) * mix(1., .65, ss(.55, .8, wS.a)), vec3f(.4, .4, .38) * (.94 + .1 * wA.b), sd < -9.5); gl = .1; }
     case 11 { alb = vec3f(.26, .02, .02); gl = .7; }
     case 13 { alb = vec3f(.25, .26, .27); gl = .95; snowK = .3; }
     case 14 { alb = vec3f(.50, .36, .03) * (.7 + .4 * wA.b); gl = .35; }
@@ -828,7 +879,7 @@ fn plight(rd: vec3f, p: vec3f, px: f32) -> f32 { let v = normalize(p - g.cam.xyz
   let sdv = normalize(cross(vd, p - g.cam.xyz));
   let w = p + sdv * (q.x * s) + vd * (q.y * (s + length(vel) * .012));
   o.cp = g.vp * vec4f(w, 1.); o.uv = q; o.wp = p;
-  let room = all(p > vec3f(${ROOM.slice(0, 3).map((v) => fl(v - 0.3)).join(',')})) && all(p < vec3f(${ROOM.slice(3).map((v) => fl(v + 0.3)).join(',')}));
+  let room = all(p > vec3f(${APTB.slice(0, 3).map((v) => fl(v - 0.3)).join(',')})) && all(p < vec3f(${APTB.slice(3).map((v) => fl(v + 0.3)).join(',')}));
   let cvr = min(1., sz / px) * ss(0., .05, g.pap.z - hs(a.x * 91.7 + a.z * 13.1 + a.y * 3.3)); let fade = ss(B * .5, B * .34, d) * ss(.25, 1.2, d) * cvr * cvr * ss(.0, .3, p.y) * f32(!room);
   o.pr = vec4f((glow(p) * .5 + FCOL * 1.1) * fade, d);
   if (fade <= 0.) { o.cp = vec4f(0., 0., 2., 1.); }
@@ -942,10 +993,18 @@ fn plight(rd: vec3f, p: vec3f, px: f32) -> f32 { let v = normalize(p - g.cam.xyz
   let life = fract(t * b.y + b.x); let h = life * b.z;
   var p = a.xyz + vec3f(0., h * (1. - .35 * life), 0.) + WDIR * (life * life * b.z * (.5 + 1.8 * g.wind.w))
     + vec3f(sin(t * .6 + b.x * 40.), 0., cos(t * .5 + b.x * 31.)) * (b.w * (.2 + life) * a.w * .5);
-  let sz = a.w * (.45 + 2.6 * life);
+  var sz = a.w * (.45 + 2.6 * life); var al = ss(.0, .12, life) * pow(1. - life, 1.4) * .2;
+  if (b.z < 0.) {
+    // a breath in the frost (rise = -1 - the heading): a puff out of the mouth every few seconds, carried forward
+    // (spread: how far) and up a little, then gone until the next one
+    let ya = -1. - b.z; let l2 = life * 2.6;
+    p = a.xyz + vec3f(sin(ya), 0., cos(ya)) * (b.w * sqrt(min(l2, 1.))) + vec3f(0., .1 * l2, 0.) + WDIR * (l2 * (.08 + .35 * g.wind.w));
+    sz = a.w * (.6 + 2.4 * l2); al = select(0., ss(.0, .08, l2) * pow(max(1. - l2, 0.), 1.6) * .5, l2 < 1.);
+  }
   let w = p + (g.right.xyz * q.x + g.up.xyz * q.y) * sz;
   o.cp = g.vp * vec4f(w, 1.); o.uv = q; o.wp = p;
-  o.pr = vec4f(glow(p) * .12 + FCOL * 2.2, ss(.0, .12, life) * pow(1. - life, 1.4) * .2);
+  o.pr = vec4f(glow(p) * .12 + FCOL * 2.2, al);
+  if (al <= 0.) { o.cp = vec4f(0., 0., 2., 1.); }
   return o;
 }
 @fragment fn fsSt(i: VO) -> @location(0) vec4f {

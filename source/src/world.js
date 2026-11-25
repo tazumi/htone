@@ -41,10 +41,20 @@ const BLD = [
   [222, 15, PI / 2, 0, 5, 2, 10, 0.25], [222, 95, PI / 2, 0, 5, 2, 9, 0.62],
   // the new towers south of the river
   [190, 350, 0, 4, 22, 1, 11, 2.3], [278, 350, 0, 4, 22, 1, 5, 2.7], [190, 458, PI, 4, 22, 1, 4, 3.1], [278, 458, PI, 4, 22, 1, 14, 3.6],
+  // more of the old quarter: a third column of courtyards to the west, one more house on the north street
+  [-440, -40, 0, 3, 3, 2, 0, 0.35], [-440, 10, PI, 3, 2, 2, 6, 0.55], [-495, -15, PI / 2, 3, 2, 2, 15, 0.75],
+  [-440, 55, 0, 3, 2, 2, 15, 0.45], [-440, 105, PI, 3, 3, 2, 0, 0.15], [-495, 80, PI / 2, 3, 2, 2, 6, 0.85], [-415, -88, 0, 3, 3, 2, 0, 0.65],
+  // the centre: five-storeys behind the police and the club, two panel towers behind the administration, one on the avenue
+  [400, -100, 0, 0, 5, 2, 11, 0.3], [455, -20, -PI / 2, 1, 9, 1, 10, 0.5], [455, 30, -PI / 2, 1, 9, 1, 11, 0.6], [378, 95, PI, 0, 5, 2, 9, 0.7], [378, 130, 0, 0, 5, 2, 10, 0.2], [222, -60, PI / 2, 0, 5, 2, 11, 0.4],
+  // south of the river: two more new towers, panel nine-storeys along the road, five-storeys on the far street
+  [360, 350, 0, 4, 22, 1, 13, 2.5], [360, 458, PI, 4, 22, 1, 7, 3.3], [95, 360, PI / 2, 1, 9, 2, 10, 0.55], [95, 440, PI / 2, 1, 9, 2, 11, 0.35], [200, 530, PI, 0, 5, 2, 9, 0.5], [270, 530, PI, 0, 5, 2, 10, 0.8],
 ].map(([x, z, yaw, t, fl, sec, pal, sd]) => {
   const T = BT[t], L = T.front.length * sec * T.bw, D = T.side.length * T.bw, [cx, cz] = rotY(-L / 2, -D / 2, yaw), fh = T.fh || FH;
   return { x: x + cx, z: z + cz, yaw, t, fl, sec, pal, sd, T, L, D, fh, H: T.base + fl * fh + T.top, cx: x, cz: z };
 });
+// people standing about: the neck's height (+ 10 for the pair of talkers), then each mouth (x, y, z, heading off the figure's)
+const PPL = { standing: [1.55, [0, 1.6, 0.25, 0]], walker: [1.54, [0, 1.6, 0.24, 0]], walkerW: [1.55, [0, 1.61, 0.24, 0]], smoker: [1.57, [0, 1.625, 0.19, 0]],
+  girl: [1.48, [0, 1.53, 0.17, 0]], trucker: [1.58, [0, 1.64, 0.18, 0]], bouncer: [1.69, [0, 1.745, 0.14, 0]], seated: [1.29, [0, 1.34, 0.07, 0]], talkers: [11.5, [0, 1.64, -0.34, 0], [0, 1.54, 0.34, PI]] };
 // a wall of building b (0 yard side, 1 back, 2 / 3 ends) has its own frame: u along it, y up, z out of it
 const FS = (b, s) => (s === 0 ? [0, b.D, 0] : s === 1 ? [b.L, 0, PI] : s === 2 ? [b.L, b.D, PI / 2] : [0, 0, -PI / 2]);
 // wall frame -> world: [x, y, z, yaw of the outward normal]
@@ -85,6 +95,22 @@ for (const x of [-157, -129]) LAMPS.push({ x, y: 5.6, z: 147.6, r: 16, c: [14, 7
 // the glow of the kitchen television: a light that stays in the room (t = -2), its brightness flickers with the picture
 const TVL = LAMPS.length;
 { const p = toW(BLD[0], 0, TVU - 0.25, TVY, TVZ - 0.5); LAMPS.push({ x: p[0], y: p[1], z: p[2], r: 5, c: [0.35, 0.5, 1.1], t: -2 }); }
+// The rest of the flat behind the kitchen, in the same wall frame (u, z; the floor at RY): the rooms [u0, u1, z0, z1]
+// (z0 the far side) - the kitchen, the living room, the corridor, the hall at the front door, the bedroom, the bathroom,
+// the toilet; the walls between them are 12 cm.
+const APT = [[RU - RW, RU + RW, RD1, RD0], [43.87, 49, -4.9, -0.42], [40.35, 46.3, -6.3, -5.02], [46.42, 49, -8.4, -5.02], [40.35, 43.5, -11.18, -6.42], [43.62, 45.4, -8.6, -6.42], [45.52, 46.3, -7.9, -6.42]];
+// the doorways: in a wall across u (k 0, the wall's middle at z = c, from a to b) or across z (k 1, at u = c), and their height
+const ADOOR = [[0, -4.96, 41.3, 42.1, 2.0], [0, -4.96, 47.6, 48.4, 2.0], [1, 46.36, -6.2, -5.12, 2.1], [0, -6.36, 42.5, 43.3, 2.0], [0, -6.36, 44.1, 44.8, 2.0], [0, -6.36, 45.52, 46.3, 2.0]];
+// the windows besides the kitchen's: the living room's on the yard, the bedroom's at the back (wall, u along the yard side)
+const AWIN = [[0, 47.85], [1, 42.05]];
+const APTB = boxW(RU - RW, RY, -11.18, 49, RY + 2.62, RD0);
+// the boxes the camera may be in: each room, each doorway (through the wall and a little into both rooms), in the world
+const AFREE = APT.map(([u0, u1, z0, z1]) => boxW(u0, RY, z0, u1, RY + 2.62, z1)).concat(ADOOR.map(([k, c, a, b, h]) => (k ? boxW(c - 0.5, RY, a, c + 0.5, RY + h, b) : boxW(a, RY, c - 0.5, b, RY + h, c + 0.5))));
+// the lights of the flat: they light only their own room (t = -2 - the room), and only inside the flat
+const ALAMP = [[1, 46.4, RY + 2.38, -2.66, 6.5, [2.6, 1.9, 1.05]], [1, 45.8, RY + 1.0, -4.3, 4.5, [0.3, 0.45, 1.0]], [2, 43.3, RY + 2.5, -5.66, 4.5, [1.1, 0.85, 0.5]], [3, 47.7, RY + 2.2, -6.7, 4.5, [1.5, 1.1, 0.6]],
+  [4, 40.52, RY + 0.8, -10.3, 4.5, [1.8, 1.1, 0.5]], [5, 45.26, RY + 2.0, -6.85, 4, [2.6, 2.5, 2.2]], [6, 45.91, RY + 2.25, -7.15, 2.5, [1.4, 1.1, 0.6]]];
+const AL0 = LAMPS.length, TVL2 = AL0 + 1;
+for (const [r, u, y, z, R, c] of ALAMP) { const p = toW(BLD[0], 0, u, y, z); LAMPS.push({ x: p[0], y: p[1], z: p[2], r: R, c, t: -2 - r }); }
 
 // lawns: x0, z0, x1, z1, kerb (1: a kerb all round); everything else is asphalt. Each is a slab a little higher
 // than the one before, so the tops never fight
@@ -142,7 +168,7 @@ function meshBuilding(b, room) {
     m.at(ox, 0, oz, a);
     for (let i = 0; i < pat.length; i++) {
       const u0 = i * bw, u1 = u0 + bw, uc = u0 + bw / 2, k = pat[i], holes = [], hb = bw / 2 - 0.3, dep = 1.15;
-      const mine = room && s === 0 && i === RSEC * 7 + RBAY;
+      const mine = room && ((s === 0 && i === RSEC * 7 + RBAY) || AWIN.some(([ws, wu]) => ws === s && abs((s ? b.L - wu : wu) - uc) < 0.1));
       if (k === 's') {
         // door, steps, canopy on two posts; the stair windows sit half a floor off the others
         holes.push([uc - 0.7, uc + 0.7, 0.13, 2.25, RD]);
@@ -203,7 +229,6 @@ function meshBuilding(b, room) {
     m.mat(M_BARK).q4([u0, y0, RD1], [u1, y0, RD1], [u1, y0, RD0], [u0, y0, RD0], [d, d, 0.8, 0.8]);
     m.mat(M_CONC).q4([u0, y1, RD0], [u1, y1, RD0], [u1, y1, RD1], [u0, y1, RD1], d);
     m.q4([u0, y0, RD1], [u0, y0, RD0], [u0, y1, RD0], [u0, y1, RD1], [d, 0.7, 0.7, d]); m.q4([u1, y0, RD0], [u1, y0, RD1], [u1, y1, RD1], [u1, y1, RD0], [0.7, d, d, 0.7]);
-    m.q4([u1, y0, RD1], [u0, y0, RD1], [u0, y1, RD1], [u1, y1, RD1], d);
     const h0 = RU - ww / 2, h1 = RU + ww / 2;
     m.q4([u0, y0, RD0], [u1, y0, RD0], [u1, s0, RD0], [u0, s0, RD0], 0.6); m.q4([u0, s1, RD0], [u1, s1, RD0], [u1, y1, RD0], [u0, y1, RD0], 0.6);
     m.q4([u0, s0, RD0], [h0, s0, RD0], [h0, s1, RD0], [u0, s1, RD0], 0.6); m.q4([h1, s0, RD0], [u1, s0, RD0], [u1, s1, RD0], [h1, s1, RD0], 0.6);
@@ -221,6 +246,68 @@ function meshBuilding(b, room) {
     m.mat(M_TINT); for (let k = 0; k < 9; k++) { const c = (j) => [u0 + 0.06 + j * 0.085, -0.5 + 0.045 * sin(j * 2.2)]; const p = c(k), q = c(k + 1); m.q4([p[0], y0 + 0.12, p[1]], [q[0], y0 + 0.12, q[1]], [q[0], y1 - 0.08, q[1]], [p[0], y1 - 0.08, p[1]], 0.75); }
   }
   return { m, W };
+}
+
+// ---------------------------------------------------------------- the rest of the viewer's flat
+// One mesh per room in the wall frame of house V: its floor (parquet, or tiles in the bathroom and the toilet), the
+// ceiling, the walls with their doorways and windows cut out, skirting boards, a switch by each door; the kitchen's
+// is only the wall to the corridor (the rest of the kitchen is in the house's own mesh). The wallpaper is the shader's
+// (seed -10 - pattern, see the solid shader).
+function meshRoom(r) {
+  const m = new Mesh(), [u0, u1, z0, z1] = APT[r], y0 = RY, y1 = RY + 2.62, wet = r >= 5, wm = r ? M_TINT : M_CONC;
+  // a wall face at fixed z (ax 0) or fixed u (ax 1) from a to b, with holes [a, b, y0, y1]
+  const face = (ax, c, a, b, holes) => {
+    const P = (t, y) => (ax ? [c, y, t] : [t, y, c]), ys = [y0, y1];
+    for (const h of holes) ys.push(h[2], h[3]);
+    ys.sort((p, q) => p - q);
+    m.mat(wm);
+    for (let j = 0; j < ys.length - 1; j++) {
+      const ya = ys[j], yb = ys[j + 1]; if (yb - ya < 1e-4) continue;
+      const cov = holes.filter((h) => h[2] <= ya + 1e-4 && h[3] >= yb - 1e-4).sort((p, q) => p[0] - q[0]);
+      let t = a; const q = (ta, tb) => m.q4(P(ta, ya), P(tb, ya), P(tb, yb), P(ta, yb), [ya > y0 ? 1 : 0.6, ya > y0 ? 1 : 0.6, 1, 1]);
+      for (const h of cov) { if (h[0] > t + 1e-4) q(t, h[0]); t = max(t, h[1]); }
+      if (b > t + 1e-4) q(t, b);
+    }
+    // skirting along the floor, broken by the doorways
+    if (r && !wet) {
+      m.mat(M_BARK); let t = a; const sk = (ta, tb) => { const n = ax ? (c > (u0 + u1) / 2 ? -1 : 1) : (c > (z0 + z1) / 2 ? -1 : 1), A = P(ta, y0), B = P(tb, y0 + 0.07); if (ax) m.box(c, y0, ta, c + n * 0.02, y0 + 0.07, tb, 0, 0.6, 1); else m.box(ta, y0, c, tb, y0 + 0.07, c + n * 0.02, 0, 0.6, 1); };
+      for (const h of holes.filter((h) => h[2] <= y0 + 0.01).sort((p, q) => p[0] - q[0])) { if (h[0] > t) sk(t, h[0]); t = max(t, h[1]); }
+      if (b > t) sk(t, b);
+    }
+  };
+  const doorsAt = (ax, c, a, b) => ADOOR.filter(([k, dc, da, db]) => k === ax && abs(dc - c) < 0.1 && da >= a - 0.01 && db <= b + 0.01).map(([k, dc, da, db, h]) => [da, db, y0, y0 + h]);
+  const winsAt = (front) => AWIN.filter(([ws, wu]) => ws === (front ? 0 : 1) && wu > u0 && wu < u1).map(([ws, wu]) => [wu - 0.725, wu + 0.725, y0 + 0.95, y0 + 2.45]);
+  if (r === 0) { face(0, z0, u0, u1, doorsAt(0, z0, u0, u1)); return m; }
+  face(0, z0, u0, u1, doorsAt(0, z0, u0, u1).concat(z0 < -11 ? winsAt(false) : []));
+  face(0, z1, u0, u1, doorsAt(0, z1, u0, u1).concat(z1 > -0.5 ? winsAt(true) : []));
+  face(1, u0, z0, z1, doorsAt(1, u0, z0, z1)); face(1, u1, z0, z1, doorsAt(1, u1, z0, z1));
+  // floor and ceiling
+  m.mat(wet ? M_TINT : M_BARK).q4([u0, y0, z0], [u1, y0, z0], [u1, y0, z1], [u0, y0, z1], 0.85);
+  m.mat(M_CONC).q4([u0, y1, z1], [u1, y1, z1], [u1, y1, z0], [u0, y1, z0], 0.9);
+  // the windows of the room: the reveal through the wall, the frame, the sill
+  for (const [ws, wu] of AWIN) {
+    if (wu < u0 || wu > u1 || (ws ? z0 > -11 : z1 < -0.5)) continue;
+    const zi = ws ? z0 : z1, zo = ws ? -11.6 : 0, sg = ws ? -1 : 1, h0 = wu - 0.725, h1 = wu + 0.725, s0 = y0 + 0.95, s1 = s0 + 1.5;
+    m.mat(M_CONC); m.q4([h0, s0, zi], [h0, s0, zo], [h0, s1, zo], [h0, s1, zi], 0.6); m.q4([h1, s0, zo], [h1, s0, zi], [h1, s1, zi], [h1, s1, zo], 0.6); m.q4([h0, s1, zi], [h0, s1, zo], [h1, s1, zo], [h1, s1, zi], 0.6);
+    const fz = zo - sg * 0.3, fb = (p, q) => m.bar([p[0], p[1], fz], [q[0], q[1], fz], 0.045, 0.06, 0.9);
+    fb([h0, s0 + 0.03], [h1, s0 + 0.03]); fb([h0, s1 - 0.03], [h1, s1 - 0.03]); fb([h0 + 0.03, s0], [h0 + 0.03, s1]); fb([h1 - 0.03, s0], [h1 - 0.03, s1]);
+    fb([wu - 0.1, s0], [wu - 0.1, s1]); fb([wu - 0.1, s1 - 0.42], [h1, s1 - 0.42]);
+    m.box(h0 - 0.12, s0 - 0.05, min(zi + sg * 0.3, fz), h1 + 0.12, s0, max(zi + sg * 0.3, fz), 0, 0.6, 1);
+    // a net curtain on a rod across the window
+    m.mat(M_METAL).bar([h0 - 0.3, y1 - 0.12, zi - sg * 0.1], [h1 + 0.3, y1 - 0.12, zi - sg * 0.1], 0.02);
+    m.mat(M_CONC); for (let k = 0; k < 12; k++) { const c = (j) => [h0 - 0.25 + j * 0.06, zi - sg * (0.12 + 0.03 * sin(j * 2.3))]; const p = c(k), q = c(k + 1); m.q4([p[0], y0 + 0.5, p[1]], [q[0], y0 + 0.5, q[1]], [q[0], y1 - 0.14, q[1]], [p[0], y1 - 0.14, p[1]], 0.8); }
+  }
+  // the doorways of the room: lining through the wall, casings, the switch on the room side
+  for (const [k, c, a, b, h] of ADOOR) {
+    const mine = k ? (abs(c - u0) < 0.1 || abs(c - u1) < 0.1) && a >= z0 - 0.01 && b <= z1 + 0.01 : (abs(c - z0) < 0.1 || abs(c - z1) < 0.1) && a >= u0 - 0.01 && b <= u1 + 0.01;
+    if (!mine) continue;
+    const yh = y0 + h, side = k ? (c > (u0 + u1) / 2 ? -1 : 1) : (c > (z0 + z1) / 2 ? -1 : 1), cf = c + side * 0.06; // the room's face of the wall
+    const B = (ta, ya, tb, yb, za, zb) => (k ? m.box(min(za, zb), ya, ta, max(za, zb), yb, tb, 0, 1, 1) : m.box(ta, ya, min(za, zb), tb, yb, max(za, zb), 0, 1, 1));
+    m.mat(M_TINT); B(a, y0, a + 0.02, yh, c - 0.06, c); B(b - 0.02, y0, b, yh, c - 0.06, c); B(a, yh - 0.02, b, yh, c - 0.06, c);
+    B(a - 0.07, y0, a, yh + 0.07, cf, cf + side * 0.015); B(b, y0, b + 0.07, yh + 0.07, cf, cf + side * 0.015); B(a - 0.07, yh, b + 0.07, yh + 0.07, cf, cf + side * 0.015);
+    m.mat(M_CONC); B(b + 0.12, y0 + 0.88, b + 0.2, y0 + 0.98, cf, cf + side * 0.012);
+  }
+  return m;
 }
 
 // ---------------------------------------------------------------- the viewer's kitchen
@@ -447,7 +534,15 @@ function makeWorld() {
   // near / only far (the forest: a fuller tree near, a plain one far)
   let LODM = 0;
   const zoneOf = (x, z) => (!LODM && abs(x) < CORE + 6 && abs(z) < CORE + 6 ? 0 : 1 + clamp(floor((x - OX) / ZW), 0, ZN_ - 1) + ZN_ * clamp(floor((z - OZ) / ZW), 0, ZN_ - 1) + LODM * ZN_ * ZN_);
-  const solid = (name, x, y, z, yaw = 0, pal = 0, seed = 0, ts = 1, an = 0, sc = 1) => { const q = qYaw(yaw), i = id[name]; inst[i].push(x, y, z, sc, q[0], q[1], q[2], q[3], pal, seed, ts, an); instZ[i].push(zoneOf(x, z)); };
+  const solid = (name, x, y, z, yaw = 0, pal = 0, seed = 0, ts = 1, an = 0, sc = 1) => {
+    // people standing about come alive (anim 12, the tex scale is the neck's height), their breath shows in the frost
+    const P = !an && PPL[name];
+    if (P) {
+      an = 12; ts = P[0]; if (!seed) seed = rnd();
+      for (let k = 1; k < P.length; k++) { const [mx, my, mz, fa] = P[k], [dx, dz] = rotY(mx * sc, mz * sc, yaw), h = (((yaw + fa) % TAU) + TAU) % TAU; steam.push(x + dx, y + my * sc, z + dz, 0.045, rnd(), rr(0.24, 0.32), -1 - h, rr(0.3, 0.4)); }
+    }
+    const q = qYaw(yaw), i = id[name]; inst[i].push(x, y, z, sc, q[0], q[1], q[2], q[3], pal, seed, ts, an); instZ[i].push(zoneOf(x, z));
+  };
   const lod = (m) => { LODM = m; };
   const wins = [], winB = [], boxes = [], rects = [], snd = [], thaw = [], bare = []; // bare: x0, z0, x1, z1 where no grass grows // winB: building * 4 + wall of each pane; snd: sounds in the world [kind, x, y, z] // rects: footprints for the ground map [cx, cz, hx, hz, yaw, weight]
   const blades = Array.from({ length: nCells }, () => []);
@@ -556,6 +651,39 @@ CARS.forEach((c, t) => reg('car' + t, meshCar(t)));
     { const p = at(RU - RW + 0.36, RY + 1.04, -1.07); for (let k = 0; k < 5; k++) steam.push(p[0], p[1], p[2], rr(0.035, 0.06), rnd(), rr(0.3, 0.4), 0.45, rr(0.4, 0.8)); }
     for (const [u, c] of [[RU - RW + 0.17, -1.07]]) { const p = at(u, RY + 0.87, c); glare.push(p[0], p[1], p[2], 0.12, 0.25, 0.45, 1.6, 0); }
     { const p = at(TVU - 0.3, TVY, TVZ); snd.push(['tvroom', p[0], p[1], p[2]]); }
+
+    // --- the rest of the flat: the rooms (wallpaper of a palette and a pattern each), the doors, the furniture under its
+    //     lamps, the television in the wall unit with its sound
+    const PAL = [13, 6, 13, 6, 10, 10, 13], PAT = [0, 2, 0, 0, 1, 3, 3];
+    APT.forEach((_, r) => { reg('apt' + r, meshRoom(r)); solid('apt' + r, b.x + q[0], 0, b.z + q[1], a + b.yaw, PAL[r], -10 - PAT[r]); });
+    const F7 = {}, f7 = (nm, ...arg) => { const k = 'f7' + nm + arg.join('_'); if (!F7[k]) { const r = PROPS7[nm](...arg); reg(k, r.build ? r : r.m); F7[k] = r; } return k; };
+    // a piece standing at (u, z) of the wall frame, turned by dir (0: its front to the yard side, PI / 2: to +u)
+    const put = (nm, u, z, dir, pal = 0, sd = 0.3, y = RY, sc = 1, ...arg) => { const k = f7(nm, ...arg), p = at(u, y, z, dir); solid(k, p[0], p[1], p[2], p[3], pal, sd, 1, 0, sc); return F7[k]; };
+    const yc = RY + 2.62, L = (i) => AL0 + i;
+    // the living room: the wall unit with the television, the sofa under the carpet, the table on the rug, an armchair, the piano
+    { const W = put('wallUnit', 45.5, -4.9, 0, 8, 0.4), T = put('tvSet', 45.5 + W.tv[0], -4.9 + W.tv[2], 0, 0, 0.2, RY + W.tv[1]);
+      dec(45.5 + W.tv[0] + T.screen[0], RY + W.tv[1] + T.screen[1], -4.9 + W.tv[2] + T.screen[2] + 0.006, 0, T.w, T.h, 3, 1.4, 'tvimg');
+      const p = at(45.8, RY + 1.0, -4.4); snd.push(['tvroom', p[0], p[1], p[2]]); }
+    put('sofa', 43.87, -2.6, PI / 2, 9, 0.3); put('wallCarpet', 43.875, -2.6, PI / 2, 0, 0.5, RY + 0.95); dec(43.875 + 0.027, RY + 1.65, -2.6, PI / 2, 1.9, 1.3, 0, 0, 'carpet');
+    put('rug', 45.9, -2.7, PI / 2, 0, 0.6); put('coffeeTable', 45.5, -2.6, PI / 2, 0, 0.2);
+    put('armchair', 48.25, -1.5, -2.45, 9, 0.7); put('floorLamp', 44.3, -0.95, 0, 6, L(0)); put('plant', 46.55, -0.95, 0.4, 7, 0.4);
+    put('piano', 49, -3.65, -PI / 2, 8, 0.8); put('radiator', 47.85, -0.42, PI, 0, 0.2); put('chandelier', 46.4, -2.66, 0, 6, L(0), yc);
+    dec(48.994, RY + 1.95, -3.65, -PI / 2, 0.32, 0.32, 0, 0, 'clock');
+    // the corridor: a runner, the lamp, the calendar; the hall: the front door, the coats, the boots, the mirror and the telephone
+    put('rug', 43.6, -5.66, PI / 2, 0, 0.9, RY, 0.42); put('plafond', 43.3, -5.66, 0, 0, L(2), yc);
+    dec(44.6, RY + 1.6, -5.026, PI, 0.64, 0.48, 0, 0, 'painting');
+    put('entranceDoor', 49, -7.2, -PI / 2, 8, 0.5); put('coatRack', 47.7, -8.4, 0, 2, 0.6); put('shoeRack', 46.42, -7.85, PI / 2, 0, 0.3);
+    put('hallMirror', 46.42, -6.95, PI / 2, 0, 0.5); put('ceilingBulb', 47.7, -6.7, 0, 0, L(3), yc);
+    // the bedroom: the bed, the bedside lamp on, the wardrobe and the dressing table, a rug, the radiator under the window
+    put('bed', 40.35, -8.9, PI / 2, 11, 0.4); put('nightstand', 40.35, -10.2, PI / 2, 6, L(4)); put('wardrobe', 43.5, -8.0, -PI / 2, 8, 0.5);
+    put('dresser', 43.5, -9.9, -PI / 2, 8, 0.6); put('rug', 41.9, -8.9, 0, 0, 0.3, RY, 0.55); put('radiator', 42.05, -11.18, 0, 0, 0.7);
+    // the bathroom and the toilet
+    put('bathtub', 44.51, -8.6, 0, 13, 0.2); put('washbasin', 45.4, -7.25, -PI / 2, 2, 0.4); put('washer', 43.62, -7.3, PI / 2, 0, 0.3);
+    put('towelRail', 43.62, -7.3, PI / 2, 11, 0.5, RY + 0.35); put('bathMat', 44.5, -7.6, 0, 7, 0.2); put('wallLamp', 45.4, -6.8, -PI / 2, 0, L(5), RY + 2.0);
+    put('toilet', 45.91, -7.9, 0, 13, 0.3); put('ceilingBulb', 45.91, -7.15, 0, 0, L(6), yc);
+    // the doors, open or ajar
+    put('intDoor', 41.3, -4.93, 0, 13, 0.1, RY, 1, 1.45); put('intDoor', 47.6, -4.93, 0, 13, 0.3, RY, 1, 1.4);
+    put('intDoor', 43.3, -6.39, PI, 13, 0.5, RY, 1, 1.25); put('intDoor', 44.8, -6.39, PI, 13, 0.7, RY, 1, 1.15); put('intDoor', 45.52, -6.33, 0, 13, 0.9, RY, 0.97, 0.4);
   }
 
   // --- by every door: the intercom (lit), the plate with the flat numbers, and what the youth of the yard wrote
@@ -690,7 +818,7 @@ CARS.forEach((c, t) => reg('car' + t, meshCar(t)));
   rseed(6);
   for (const [x, z, k, s] of TREES) { if (nearDoor(x, z)) continue; solid('tree' + k, x, max(grassY(x, z), 0) - 0.05, z, rr(0, TAU), k === 2 ? 1 : 0, rnd(), 1, 1, s * rr(0.92, 1.08)); if (k < 3 || k === 4) boxes.push([x - 0.3, z - 0.3, x + 0.3, z + 0.3, 3]); }
   for (let i = 0; i < 46; i++) { // the outskirts
-    const x = rr(-185, 185), z = rr(-125, 185); if (hypot(x, z + 10) < 95 || lawnAt(x, z) < 0 || inBld(x, z, 4) || nearDoor(x, z, 3)) continue;
+    const x = rr(-185, 185), z = rr(-125, 185); if (hypot(x, z + 10) < 95 || onStreet(x, z, 4) || (x > RAMPN[0] - 4 && x < RAMPN[2] + 4 && z > RAMPN[1] - 4 && z < RAMPN[3] + 4) || lawnAt(x, z) < 0 || inBld(x, z, 4) || nearDoor(x, z, 3)) continue;
     solid('tree' + [0, 1, 2, 4][rnd() * 4 | 0], x, lawnY(lawnAt(x, z)) - 0.05, z, rr(0, TAU), rnd() < 0.3 ? 1 : 0, rnd(), 1, 1, rr(0.8, 1.25));
   }
   {
@@ -769,6 +897,7 @@ CARS.forEach((c, t) => reg('car' + t, meshCar(t)));
   // --- which lamps light what: an LGN x LGN grid over the world with the 8 strongest lamps of each 6 m square (two texels)
   const lg = new Uint8Array(LGN * 2 * LGN * 4).fill(255), cand = Array.from({ length: LGN * LGN }, () => []);
   LAMPS.forEach((l, k) => {
+    if (l.t < -1.5) return; // the flat's own lights: the shader goes through them in the flat
     const r = l.r + 4.3 + 4.3, i0 = max(0, floor((l.x - r - OX) / 6)), i1 = min(LGN - 1, floor((l.x + r - OX) / 6)), j0 = max(0, floor((l.z - r - OZ) / 6)), j1 = min(LGN - 1, floor((l.z + r - OZ) / 6));
     for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) { const d = max(hypot((i + 0.5) * 6 + OX - l.x, (j + 0.5) * 6 + OZ - l.z) - 4.3, 0); if (d < l.r) cand[i + LGN * j].push([l.c[1] * (1 - d * d / (l.r * l.r)) ** 2 / (d * d + 30), k]); }
   });

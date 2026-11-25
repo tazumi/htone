@@ -153,6 +153,23 @@ function makeAtlas() {
     c.fillStyle = '#b02020'; c.fillRect(0, 0, w, 40); c.fillStyle = '#f2efe6'; c.fillRect(6, 40, w - 12, h - 46); c.fillStyle = '#fff'; c.font = `bold 22px ${FN}`; c.textAlign = 'center'; c.fillText('НОЯБРЬ', w / 2, 28);
     c.fillStyle = '#c02020'; c.font = `bold 72px ${FN}`; c.fillText('24', w / 2, 118); c.fillStyle = '#333'; c.font = `18px ${FN}`; c.fillText('вторник', w / 2, 150);
   });
+  // ---- the rest of the flat: the carpet on the living room wall, a landscape in a frame in the corridor
+  cell('carpet', 320, 224, (w, h) => {
+    c.fillStyle = '#6e1410'; c.fillRect(0, 0, w, h);
+    const band = (m, col) => { c.strokeStyle = col; c.lineWidth = 7; c.strokeRect(m, m, w - 2 * m, h - 2 * m); };
+    band(10, '#c89a48'); band(22, '#1c2a48'); band(32, '#c89a48');
+    c.save(); c.translate(w / 2, h / 2);
+    for (const [r, col] of [[78, '#1c2a48'], [62, '#c89a48'], [48, '#8a2018'], [30, '#e0c890'], [16, '#1c2a48']]) { c.fillStyle = col; c.beginPath(); c.moveTo(0, -r * 0.8); c.lineTo(r * 1.3, 0); c.lineTo(0, r * 0.8); c.lineTo(-r * 1.3, 0); c.closePath(); c.fill(); }
+    c.restore();
+    c.fillStyle = '#c89a48'; for (const [x, y] of [[60, 56], [w - 60, 56], [60, h - 56], [w - 60, h - 56]]) { c.beginPath(); c.moveTo(x, y - 14); c.lineTo(x + 18, y); c.lineTo(x, y + 14); c.lineTo(x - 18, y); c.fill(); }
+    c.fillStyle = 'rgba(0,0,0,.18)'; for (let y = 0; y < h; y += 3) c.fillRect(0, y, w, 1);
+  });
+  cell('painting', 224, 168, (w, h) => {
+    c.fillStyle = '#5a3a1a'; c.fillRect(0, 0, w, h); c.fillStyle = '#c8a060'; c.fillRect(8, 8, w - 16, h - 16);
+    const g = c.createLinearGradient(0, 14, 0, h * 0.62); g.addColorStop(0, '#9ab0c8'); g.addColorStop(1, '#e8d8b8'); c.fillStyle = g; c.fillRect(14, 14, w - 28, h - 28);
+    c.fillStyle = '#e8ece8'; c.fillRect(14, h * 0.62, w - 28, h * 0.38 - 14);
+    for (let k = 0; k < 9; k++) { const x = 24 + k * 21 + rr(-4, 4), t = rr(40, 70); c.fillStyle = '#f2f0ea'; c.fillRect(x, h * 0.66 - t, 3.5, t); c.fillStyle = '#222'; for (let j = 0; j < 4; j++) c.fillRect(x, h * 0.66 - rr(5, t), 3.5, 1.5); c.fillStyle = 'rgba(150,120,60,.8)'; c.beginPath(); c.arc(x + 2, h * 0.66 - t, 9, 0, TAU); c.fill(); }
+  });
   // ---- goods: forty kinds for the shop windows, each drawn standing on a shelf at (x, y) with height h
   const label = (x, y, w, h, bg, fg, s) => { c.fillStyle = bg; c.fillRect(x, y, w, h); if (s) { c.fillStyle = fg; c.textAlign = 'center'; c.textBaseline = 'middle'; fit(s, FN, h * 0.7, w * 0.9, 'bold'); c.fillText(s, x + w / 2, y + h / 2); } };
   const bottle = (x, y, w, h, glass, cap, lab, txt) => {

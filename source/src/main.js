@@ -392,6 +392,7 @@ function render() {
   { const o = U_LAMP + FLICK * 8 + 4, c = LAMPS[FLICK].c, f = F[FLK]; m[o] = c[0] * f; m[o + 1] = c[1] * f; m[o + 2] = c[2] * f; }
   { const o = U_LAMP + FLICK2 * 8 + 4, c = LAMPS[FLICK2].c, f = fract(sin(floor(F[TIME] * 9) * 47.3) * 9631.7) > 0.8 || fract(F[TIME] / 17) > 0.9 ? 0.08 : 1; m[o] = c[0] * f; m[o + 1] = c[1] * f; m[o + 2] = c[2] * f; }
   { const o = U_LAMP + TVL * 8 + 4, c = LAMPS[TVL].c, f = 0.55 + 0.45 * fract(sin(floor(F[TIME] * 3) * 127.1) * 43758.5453); m[o] = c[0] * f; m[o + 1] = c[1] * f; m[o + 2] = c[2] * f; }
+  { const o = U_LAMP + TVL2 * 8 + 4, c = LAMPS[TVL2].c, f = 0.5 + 0.5 * fract(sin(floor(F[TIME] * 2.3 + 0.5) * 91.7) * 43758.5453); m[o] = c[0] * f; m[o + 1] = c[1] * f; m[o + 2] = c[2] * f; }
   // the club's light over its door goes round the colours on the beat
   { const o = U_LAMP + CLUBL * 8 + 4, t = F[TIME], b = 0.35 + 0.65 * (fract(t * 2.13) < 0.5 ? 1 : 0); for (let j = 0; j < 3; j++) m[o + j] = 9 * b * (0.5 + 0.5 * cos(TAU * (t * 0.23 + j / 3))); }
   Q.writeBuffer(ubo, 0, UB);
@@ -484,7 +485,7 @@ function world(dt) {
 // Boxes for the houses, the cars and the posts; the viewer's room and the window opening are a hole in the first one.
 const CR = 0.3;
 const inB = (b, x, y, z, m) => x > b[0] + m && x < b[3] - m && y > b[1] + m && y < b[4] - m && z > b[2] + m && z < b[5] - m;
-const free = (x, y, z) => inB(ROOM, x, y, z, 0.22) || inB(TUN, x, y, z, 0.1);
+const free = (x, y, z) => inB(TUN, x, y, z, 0.1) || AFREE.some((b, i) => inB(b, x, y, z, i < APT.length ? 0.22 : 0.1));
 // inside the walls of the viewer's house
 const home = (x, y, z) => x > BX[0] - CR && x < BX[2] + CR && z > BX[1] - CR && z < BX[3] + CR && y < BX[4] + CR && !free(x, y, z);
 function collide() {
@@ -547,7 +548,7 @@ function frame(now) {
     const vx = F[VX] + ((sy * cp * mf + cw * mr) * sp - F[VX]) * k, vy = F[VY] + ((sin(pitch) * mf + mu) * sp - F[VY]) * k, vz = F[VZ] + ((-cw * cp * mf + sy * mr) * sp - F[VZ]) * k;
     F[YAW] = yaw; F[PIT] = pitch; F[VX] = vx; F[VY] = vy; F[VZ] = vz; F[MX] = vx * dt; F[MY] = vy * dt; F[MZ] = vz * dt;
     collide();
-    F[INR] += ((inB(ROOM, F[CX], F[CY], F[CZ], -0.3) ? 1 : 0) - F[INR]) * (1 - exp(-dt * 6));
+    F[INR] += ((inB(APTB, F[CX], F[CY], F[CZ], -0.3) ? 1 : 0) - F[INR]) * (1 - exp(-dt * 6));
   }
   render();
   if (hud) {

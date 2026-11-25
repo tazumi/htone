@@ -259,6 +259,8 @@ function mkSound(ac) {
       } else if (o.kind === 'chat') {
         for (; o.next < ahead; o.step++) {
           const a = o.next, v = o.v[o.who];
+          // they talk for a while, then stand quiet
+          if (o.step > (o.len || 30)) { v.g.gain.setTargetAtTime(0, a, 0.05); o.step = 0; o.len = 25 + (rnd() * 70 | 0); o.next = a + rr(3, 15); continue; }
           if (o.step % 7 === 6) { v.g.gain.setTargetAtTime(0, a, 0.03); o.who ^= 1; o.next = a + rr(0.2, 0.9); continue; }
           if (rnd() < 0.04) { // a laugh: short bursts falling in pitch
             for (let k = 0; k < 4; k++) { const b = a + k * 0.16; v.vo.frequency.setValueAtTime(v.vo.frequency.value * 1.3 * (1 - k * 0.06), b); v.g.gain.setValueAtTime(0.45, b); v.g.gain.setTargetAtTime(0.02, b + 0.08, 0.02); }
