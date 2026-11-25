@@ -70,7 +70,7 @@ function town(o) {
       solid(nm, p[0], 0.12 * (nm === 'cat'), p[2], ya, nm === 'cat' ? pick([3, 6, 8, 9]) : pick([5, 4, 11, 1]), di, 1, 0);
     }
     // the far houses get a bench and a bin by every door, and a bulb over it without a lamp
-    if (bi >= 2 && b.t < 2) {
+    if (bi >= 2 && b.t !== 2) {
       const p = at(uc - side * 2.6, 0, 1.4); solid('bench', p[0], g0(p[0], p[2]), p[2], p[3] - PI / 2, 8, uc);
       const q = at(uc - side * 3.6, 0, 1.4); solid('urn', q[0], g0(q[0], q[2]), q[2]);
       if (!LAMPS.some((l) => l.t === -1 && hypot(l.x - x, l.z - z) < 2)) { const p2 = at(uc, 2.32, 0.95); solid('bulb', p2[0], p2[1] + 0.12, p2[2], 0, 0, -1); glare.push(p2[0], p2[1], p2[2], 0.45, 3.2, 1.9, 0.9, 0); }
@@ -123,14 +123,14 @@ function town(o) {
       if (ty === 0 && zz < 0 && rnd() < 0.05 && y > 3) { const p = toW(b, s, u + w / 2 + 0.45, y + 0.2, 0); solid('dish', p[0], p[1], p[2], p[3], 0, rnd()); }
     }
     if (b.t === 0) { const p = toW(b, rnd() < 0.5 ? 2 : 3, b.D * rr(0.25, 0.75), 0, 0); solid('ladder', p[0], 0, p[2], p[3]); }
-    if (b.t < 2) {
+    if (b.t < 2 || b.t === 4) {
       // on the roof: vent shafts, aerials, pigeons along the parapet; the lift motor hums under the panel houses' huts
       const roof = (x, zz) => { const [wx, wz] = rotY(x, zz, b.yaw); return [b.x + wx, b.z + wz]; };
       for (let k = 0; k < b.sec; k++) {
         const xc = (k + 0.5) * b.L / b.sec;
         for (const dx of [-5.5, 5.2]) { const [x, z] = roof(xc + dx + rr(-1, 1), b.D * rr(0.25, 0.75)); solid('vent', x, b.H - 0.35, z, b.yaw + rr(-0.1, 0.1)); }
         if (rnd() < 0.6) { const [x, z] = roof(xc + rr(-7, 7), b.D * rr(0.2, 0.8)); solid('aerial', x, b.H - 0.35, z, rr(0, TAU)); }
-        if (b.t === 1) { const [x, z] = roof(xc, b.D / 2); snd.push(['lift', x, b.H + 1, z]); }
+        if (b.t === 1 || b.t === 4) { const [x, z] = roof(xc, b.D / 2); snd.push(['lift', x, b.H + 1, z]); }
       }
       if (i === 1 || i === 2 || i === 4) for (let k = 0; k < 5; k++) { const p = toW(b, 0, b.L * 0.3 + k * 0.4 + rr(-0.1, 0.1), b.H, -0.12); solid('pigeon', p[0], p[1], p[2], p[3] + PI / 2 + rr(-0.5, 0.5), pick([1, 0, 9]), k); }
     }
@@ -146,7 +146,7 @@ function town(o) {
     for (let k = 0; k < winB.length; k++) {
       const bi = winB[k] >> 2, y = wins[k * 8 + 1];
       if (wins[k * 8 + 7] !== 0 || (winB[k] & 3) > 1 || y < 3 || hypot(wins[k * 8] - EYE[0], wins[k * 8 + 2] - EYE[2]) < 8) continue;
-      ([1, 2].includes(bi) ? near : far).push(k);
+      if (bi < 13) ([1, 2].includes(bi) ? near : far).push(k);
     }
     const take = (L, fl) => { const k = L.splice(rnd() * L.length | 0, 1)[0]; wins[k * 8 + 7] = fl * 4; };
     for (const [fl, nn, nf] of [[4, 2, 4], [5, 2, 6], [6, 1, 3], [7, 1, 2], [8, 1, 2], [9, 2, 4]]) { for (let j = 0; j < nn; j++) take(near, fl); for (let j = 0; j < nf; j++) take(far, fl); }
@@ -290,8 +290,8 @@ function town(o) {
   }
   // the river along the south edge, frozen; fishermen's tents on it with a lantern each
   {
-    const m = new Mesh().mat(M_LENS); m.box(-192, 0, 166, 192, 0.2, 186, 4, 1, 1); o.reg('river', m); solid('river', 0, 0, 0);
-    for (const [x, z, pal] of [[18, 176, 11], [26.5, 180.5, 5], [-44, 173, 14], [72, 177, 4], [-120, 179, 15]]) { solid('tent', x, 0.2, z, rr(-0.5, 0.5), pal, x); glare.push(x + 0.3, 1.0, z + 1.1, 0.3, 3, 1.8, 0.7, 0); }
+    const m = new Mesh().mat(M_LENS); m.box(-576, 0, 166, 576, 0.3, 186, 4, 1, 1); o.reg('river', m); solid('river', 0, 0, 0);
+    for (const [x, z, pal] of [[18, 176, 11], [26.5, 180.5, 5], [-44, 173, 14], [72, 177, 4], [-120, 179, 15], [-330, 176, 4], [380, 178, 11]]) { solid('tent', x, 0.3, z, rr(-0.5, 0.5), pal, x); glare.push(x + 0.3, 1.0, z + 1.1, 0.3, 3, 1.8, 0.7, 0); }
   }
   // school, kindergarten, church, works, building site, water tower, telecom tower
   const farB = (nm, x, z, a, pal, sz) => {

@@ -49,9 +49,13 @@ const qYaw = (a) => [0, sin(a / 2), 0, cos(a / 2)];
 // turns the local point (x, z) by yaw about the vertical, the same way qYaw does
 const rotY = (x, z, a) => [x * cos(a) + z * sin(a), -x * sin(a) + z * cos(a)];
 
-// world grid: 384 m square around the yard, ground at y = 0, north is -z
-const OX = -192, OZ = -192, WORLD = 384;
-const CELLS = 16, CELLW = 24; // culling grid over XZ
+// world grid: the town, 1152 m square, ground at y = 0, north is -z; the estate is the 384 m square in its middle
+// (CORE: its half size), where the ground map is finer
+const OX = -576, OZ = -576, WORLD = 1152, CORE = 192, WE = 570; // WE: how far the camera may go from the middle
+const CELLS = 48, CELLW = 24; // culling grid over XZ
+const ZW = 96, ZN_ = 12, NZONE = 1 + 3 * ZN_ * ZN_; // zones the solids are drawn by (world.js), ZW metres square
+const WDX = 0.553, WDZ = 0.833; // the wind blows from the north-west
+const MAPW = 1280, MAPH = 768, LGN = WORLD / 6; // the ground maps' texture; the lamp grid, 6 m squares
 
 // material ids, stored per vertex (see Mesh.v) and switched on in the solid shader
 const M_ASPH = 0, M_BRICK = 1, M_PANEL = 2, M_PAINT = 3, M_GLASS = 4, M_DARK = 5, M_BARK = 6, M_TINT = 7, M_LAMP = 8, M_METAL = 9,

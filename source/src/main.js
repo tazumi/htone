@@ -44,12 +44,12 @@ const sCmp = device.createSampler({ compare: 'less-equal', magFilter: 'linear', 
 const tShadow = tex(SHADOW, SHADOW, DEPTH, TU.RENDER_ATTACHMENT | TU.TEXTURE_BINDING);
 const tDummy = tex(1, 1, DEPTH, TU.RENDER_ATTACHMENT | TU.TEXTURE_BINDING);
 const tDetail = tex(1024, 1024, 'rgba8unorm', TU.RENDER_ATTACHMENT | TU.TEXTURE_BINDING, { mips: 11 });
-const tMap = tex(512, 512, 'rgba8unorm', TU.TEXTURE_BINDING | TU.COPY_DST);
-const tLamp = tex(128, 64, 'rgba8uint', TU.TEXTURE_BINDING | TU.COPY_DST);
+const tMap = tex(MAPW, MAPH, 'rgba8unorm', TU.TEXTURE_BINDING | TU.COPY_DST);
+const tLamp = tex(LGN * 2, LGN, 'rgba8uint', TU.TEXTURE_BINDING | TU.COPY_DST);
 const tAtlas = tex(ATLAS, ATLASH, 'rgba8unorm', TU.TEXTURE_BINDING | TU.COPY_DST | TU.RENDER_ATTACHMENT, { mips: 12 });
 
 // the uniform block G (see shaders.js): offsets in floats
-const U_CAM = 16, U_RIGHT = 20, U_UP = 24, U_FWD = 28, U_RES = 32, U_MIS = 36, U_WIND = 40, U_PAP = 44, U_TR = 48, U_TR2 = 52, U_PL = 56, U_EV = 60, U_RC = 64, U_LAMP = U_RC + NRC * 4;
+const U_CAM = 16, U_RIGHT = 20, U_UP = 24, U_FWD = 28, U_RES = 32, U_MIS = 36, U_WIND = 40, U_PAP = 44, U_TR = 48, U_TR2 = 52, U_PL = 56, U_EV = 60, U_HN = 64, U_HZ = 68, U_RC = U_HZ + 48, U_LAMP = U_RC + NRC * 4, NL = LAMPS.length;
 const UB = new Float32Array(U_LAMP + NL * 8);
 const ubo = device.createBuffer({ size: UB.byteLength, usage: BU.UNIFORM | BU.COPY_DST });
 LAMPS.forEach((l, i) => UB.set([l.x, l.y, l.z, l.r, l.c[0], l.c[1], l.c[2], l.t], U_LAMP + i * 8));
@@ -207,11 +207,39 @@ const ibGrass = buf(new Uint8Array(Wd.grass.buf), BU.VERTEX);
 const ibSnowB = buf(Wd.snow, BU.VERTEX), ibGlare = buf(Wd.glare, BU.VERTEX), ibSteam = buf(Wd.steam, BU.VERTEX), ibPaper = buf(Wd.paper, BU.VERTEX);
 const ibDecB = buf(decF, BU.VERTEX), nDec = Wd.decals.length;
 const nGlare = Wd.glare.length / 8, nSteam = Wd.steam.length / 8, nPaper = Wd.paper.length / 8;
-Q.writeTexture({ texture: tMap }, Wd.gm, { bytesPerRow: 2048 }, [512, 512]);
-Q.writeTexture({ texture: tLamp }, Wd.lg, { bytesPerRow: 512 }, [128, 64]);
+Q.writeTexture({ texture: tMap }, Wd.gm, { bytesPerRow: MAPW * 4 }, [MAPW, MAPH]);
+Q.writeTexture({ texture: tLamp }, Wd.lg, { bytesPerRow: LGN * 8 }, [LGN * 2, LGN]);
 // what the camera can't pass: x0, z0, x1, z1, height per box; the first is the viewer's house
 const BX = new Float32Array(Wd.boxes.flat()), NBX = Wd.boxes.length;
-const drawSolids = (r, sh) => { for (let i = 0; i < meshes.length; i++) { const m = meshes[i], g = Wd.ranges[i]; if (g[1] && !(sh && m.noSh)) r.drawIndexed(m.n, g[1], m.i0, m.v0, g[0]); } };
+// the solids go by zones (world.js): the estate always, the town's squares when in view and near enough, the forest's
+// fuller trees only near and its plain ones only far; the lamps' shadows are baked from the estate alone
+const zv = new Uint8Array(NZONE), ZB = Wd.zb, FARZ = 300, NEARZ = 125; // beyond FARZ the haze leaves 4 % of anything
+const drawSolids = (r, sh) => { for (let i = 0; i < meshes.length; i++) { const m = meshes[i], R = Wd.ranges[i]; if (sh && m.noSh) continue; for (let k = 0; k < R.length; k++) { const g = R[k]; if (sh ? !g[2] : zv[g[2]]) r.drawIndexed(m.n, g[1], m.i0, m.v0, g[0]); } } };
+function zones() {
+  const cx = F[CX], cy = F[CY], cz = F[CZ], fx = F[FX], fy = F[FY], fz = F[FZ], rx = F[RX], rz = F[RZ], ux = F[UX], uy = F[UY], uz = F[UZ], tx = TANH * W / H, far = FARZ * (0.6 + 0.4 * det);
+  zv[0] = 1;
+  for (let z = 1; z < NZONE; z++) {
+    const o = z * 6; zv[z] = 0; if (ZB[o] > ZB[o + 3]) continue;
+    const ex = (ZB[o + 3] - ZB[o]) * 0.5, ey = (ZB[o + 4] - ZB[o + 1]) * 0.5, ez = (ZB[o + 5] - ZB[o + 2]) * 0.5, px = ZB[o] + ex - cx, py = ZB[o + 1] + ey - cy, pz = ZB[o + 2] + ez - cz;
+    const dx = max(abs(px) - ex, 0), dy = max(abs(py) - ey, 0), dz = max(abs(pz) - ez, 0), d = sqrt(dx * dx + dy * dy + dz * dz), mode = (z - 1) / (ZN_ * ZN_) | 0;
+    if (d > far || (mode === 1 && d > NEARZ) || (mode === 2 && d <= NEARZ)) continue;
+    const lim = px * fx + py * fy + pz * fz + ex * abs(fx) + ey * abs(fy) + ez * abs(fz);
+    if (lim >= 0 && abs(px * rx + pz * rz) - ex * abs(rx) - ez * abs(rz) <= lim * tx && abs(px * ux + py * uy + pz * uz) - ex * abs(ux) - ey * abs(uy) - ez * abs(uz) <= lim * TANH) zv[z] = 1;
+  }
+}
+// the lamps whose light in the haze can be seen from here, nearest first (at most 48)
+const hzD = new Float32Array(48), hzI = new Float32Array(48);
+function hazeList() {
+  const cx = F[CX], cy = F[CY], cz = F[CZ]; let n = 0;
+  for (let k = 0; k < NL; k++) {
+    const l = LAMPS[k]; if (l.t < -1.5) continue;
+    const d = hypot(l.x - cx, l.y - cy, l.z - cz) - l.r; if (d > 260) continue;
+    let j = n < 48 ? n++ : 47; if (j === 47 && n === 48 && d >= hzD[47]) continue;
+    while (j > 0 && hzD[j - 1] > d) { hzD[j] = hzD[j - 1]; hzI[j] = hzI[j - 1]; j--; }
+    hzD[j] = d; hzI[j] = k;
+  }
+  UB[U_HN] = n; for (let j = 0; j < n; j++) UB[U_HZ + j] = hzI[j];
+}
 
 // ---------------------------------------------------------------- one-time bakes: detail texture, the lamps' shadow atlas
 {
@@ -228,7 +256,7 @@ const drawSolids = (r, sh) => { for (let i = 0; i < meshes.length; i++) { const 
   const TS = SHADOW / 4, vSh = tShadow.createView(), za = ZF / (ZF - ZN), zb = -ZF * ZN / (ZF - ZN);
   let first = true;
   for (const l of LAMPS) {
-    if (l.t < 0) continue;
+    if (l.t < 0 || l.t > 15) continue; // only the estate's lamps have a tile
     const m = new Float32Array(UB.length), u = device.createBuffer({ size: UB.byteLength, usage: BU.UNIFORM | BU.COPY_DST });
     m[0] = 1 / TANL; m[12] = -l.x / TANL; m[9] = 1 / TANL; m[13] = -l.z / TANL; m[6] = -za; m[14] = za * l.y + zb; m[7] = -1; m[15] = l.y;
     Q.writeBuffer(u, 0, m);
@@ -360,12 +388,16 @@ function render() {
   m[U_TR2] = F[FRX]; m[U_TR2 + 1] = F[FRD]; m[U_TR2 + 2] = F[FRON];
   m[U_PL] = F[PLX]; m[U_PL + 1] = F[PLZ]; m[U_PL + 2] = F[PLH]; m[U_PL + 3] = F[PLON];
   for (let k = 0; k < NRC * 4; k++) m[U_RC + k] = F[RC + k];
+  hazeList();
   { const o = U_LAMP + FLICK * 8 + 4, c = LAMPS[FLICK].c, f = F[FLK]; m[o] = c[0] * f; m[o + 1] = c[1] * f; m[o + 2] = c[2] * f; }
   { const o = U_LAMP + FLICK2 * 8 + 4, c = LAMPS[FLICK2].c, f = fract(sin(floor(F[TIME] * 9) * 47.3) * 9631.7) > 0.8 || fract(F[TIME] / 17) > 0.9 ? 0.08 : 1; m[o] = c[0] * f; m[o + 1] = c[1] * f; m[o + 2] = c[2] * f; }
   { const o = U_LAMP + TVL * 8 + 4, c = LAMPS[TVL].c, f = 0.55 + 0.45 * fract(sin(floor(F[TIME] * 3) * 127.1) * 43758.5453); m[o] = c[0] * f; m[o + 1] = c[1] * f; m[o + 2] = c[2] * f; }
+  // the club's light over its door goes round the colours on the beat
+  { const o = U_LAMP + CLUBL * 8 + 4, t = F[TIME], b = 0.35 + 0.65 * (fract(t * 2.13) < 0.5 ? 1 : 0); for (let j = 0; j < 3; j++) m[o + j] = 9 * b * (0.5 + 0.5 * cos(TAU * (t * 0.23 + j / 3))); }
   Q.writeBuffer(ubo, 0, UB);
 
   { let cr = floor((cz - OZ) / CELLW) | 0; cr = cr < 0 ? 0 : cr > CELLS - 1 ? CELLS - 1 : cr; let n = 0; rowOrd[n++] = cr; for (let d = 1; d < CELLS; d++) { if (cr - d >= 0) rowOrd[n++] = cr - d; if (cr + d < CELLS) rowOrd[n++] = cr + d; } }
+  zones();
   const e = device.createCommandEncoder();
   let slot = null;
   if (hasTS) { for (let i = 0; i < qRead.length; i++) if (!qRead[i].busy) { slot = qRead[i]; break; } }
@@ -432,15 +464,16 @@ function world(dt) {
   F[FLK] = o ? (fract(sin(floor(t * 7) * 33.1) * 9631.7) > 0.7 ? 0.9 : 0.04) : n > 0.86 ? 0.25 : 1;
   // the highway: every slot sends a vehicle of its own kind now and then, at the kind's speed
   for (let k = 0; k < NRC; k++) {
-    const q = t + ROADO[k], c = floor(q / ROADP[k]), h = ihash(k, c, 3), kind = vehKind(h), v = VEH[kind][1] * (0.9 + 0.2 * fract(h * 13.7)), x = (q - c * ROADP[k]) * v - 215 - VEH[kind][0];
-    F[RC + k * 4] = (k & 1 ? -1 : 1) * x; F[RC + k * 4 + 1] = k & 1 ? -1 : 1; F[RC + k * 4 + 2] = x < 215 + VEH[kind][0] ? 1 : 0; F[RC + k * 4 + 3] = kind;
+    // a slow vehicle that could not cross the whole town within its slot's period sends a car instead
+    const q = t + ROADO[k], c = floor(q / ROADP[k]), h = ihash(k, c, 3), k0 = vehKind(h), kind = VEH[k0][1] * 0.9 * ROADP[k] < 2 * (WE + 30 + VEH[k0][0]) ? (h * 37 | 0) % 5 : k0, v = VEH[kind][1] * (0.9 + 0.2 * fract(h * 13.7)), x = (q - c * ROADP[k]) * v - WE - 25 - VEH[kind][0];
+    F[RC + k * 4] = (k & 1 ? -1 : 1) * x; F[RC + k * 4 + 1] = k & 1 ? -1 : 1; F[RC + k * 4 + 2] = x < WE + 25 + VEH[kind][0] ? 1 : 0; F[RC + k * 4 + 3] = kind;
   }
   const q = t + TRAINP - TRAIN0, c = floor(q / TRAINP), s = q - c * TRAINP, d = floor(c / 2) & 1 ? -1 : 1;
   if (c & 1) {
     // freight: x is the nose of the locomotive, the cars trail behind it
-    F[TRON] = 0; F[TRX] = -1e4; F[FRD] = d; const x = -205 + FREIGHTV * s; F[FRON] = x - FRL < 205 ? 1 : 0; F[FRX] = d * x;
+    F[TRON] = 0; F[TRX] = -1e4; F[FRD] = d; const x = -WE - 20 + FREIGHTV * s; F[FRON] = x - FRL < WE + 20 ? 1 : 0; F[FRX] = d * x;
   } else {
-    F[FRON] = 0; F[FRX] = -1e4; F[TRD] = d; F[TRON] = s < 41.5 ? 1 : 0; F[TRX] = d > 0 ? -545 + TRAINV * s : 333 - TRAINV * s;
+    F[FRON] = 0; F[FRX] = -1e4; F[TRD] = d; F[TRON] = s < (2 * WE + 290) / TRAINV ? 1 : 0; F[TRX] = d > 0 ? -WE - 255 + TRAINV * s : WE + 35 - TRAINV * s;
   }
   // an aeroplane far overhead now and then, on a new heading every time
   const pc = floor((t + 60) / PLANEP), ps = t + 60 - pc * PLANEP, ph = ihash(pc, 7, 11) * TAU, pd = (ps / PLANET - 0.5) * 16000, po = (ihash(pc, 5, 2) - 0.5) * 5000;
@@ -456,7 +489,7 @@ const free = (x, y, z) => inB(ROOM, x, y, z, 0.22) || inB(TUN, x, y, z, 0.1);
 const home = (x, y, z) => x > BX[0] - CR && x < BX[2] + CR && z > BX[1] - CR && z < BX[3] + CR && y < BX[4] + CR && !free(x, y, z);
 function collide() {
   let x = F[CX] + F[MX], y = F[CY] + F[MY], z = F[CZ] + F[MZ];
-  x = x < -186 ? -186 : x > 186 ? 186 : x; z = z < -188 ? -188 : z > 186 ? 186 : z; y = y < 0.4 ? 0.4 : y > 95 ? 95 : y;
+  x = x < -WE ? -WE : x > WE ? WE : x; z = z < -WE ? -WE : z > WE ? WE : z; y = y < 0.4 ? 0.4 : y > 95 ? 95 : y;
   if (z < RAILZ + 11.5 && y < RAILY + 0.5) y = min(RAILY + 0.5, max(y, (RAILZ + 11.5 - z) * 0.5 + 0.4));
   if (free(F[CX], F[CY], F[CZ])) {
     // in the room: take the move one axis at a time, so the walls are slid along

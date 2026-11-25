@@ -319,6 +319,37 @@ function makeAtlas() {
     c.fillStyle = '#2a5a2a'; for (let k = 0; k < 40; k++) c.fillRect(rr(10, w - 10), rr(60, 110), 2, rr(10, 30)); c.fillStyle = '#3a4a5a'; for (let k = 0; k < 6; k++) c.fillRect(14 + k * 40, 96, 30, 32);
     const g = c.createRadialGradient(w / 2, h / 2, 20, w / 2, h / 2, 160); g.addColorStop(0, 'rgba(255,255,255,.1)'); g.addColorStop(1, 'rgba(255,255,255,.55)'); c.fillStyle = g; c.fillRect(0, 0, w, h);
   });
+  // ---- the town round the estate: the centre, the hospital, the club, the cafe on the highway, the shops, the park
+  sign('signAdmin', 768, 80, '#e8e4d8', '#3a2a10', 'АДМИНИСТРАЦИЯ ГОРОДА', FN);
+  sign('signPolice', 512, 96, '#0a3a9a', '#fff', 'ПОЛИЦИЯ');
+  sign('signFire', 768, 96, '#b01010', '#fff', 'ПОЖАРНАЯ ЧАСТЬ № 3');
+  sign('signHosp', 768, 96, '#f4f4f4', '#103a8a', 'ГОРОДСКАЯ БОЛЬНИЦА', FN);
+  cell('signER', 512, 96, (w, h) => neon('ПРИЁМНЫЙ ПОКОЙ', [1, 0.12, 0.1], 70, w, h));
+  cell('redCross', 160, 160, (w, h) => {
+    c.fillStyle = rgb(0.95, 0.95, 0.95); c.fillRect(0, 0, w, h); c.fillStyle = rgb(0.85, 0.05, 0.05);
+    c.fillRect(w / 2 - 24, 14, 48, h - 28); c.fillRect(14, h / 2 - 24, w - 28, 48);
+  });
+  cell('signClub', 768, 160, (w, h) => { neon('ОРБИТА', [1, 0.1, 0.8], 130, w, h * 0.78); c.shadowBlur = 0; c.fillStyle = rgb(0.3, 0.8, 1); c.textAlign = 'center'; fit('НОЧНОЙ КЛУБ', FN, 26, w * 0.5, 'bold'); c.fillText('НОЧНОЙ КЛУБ', w / 2, h - 18); });
+  cell('glassblock', 256, 32, (w, h) => { c.fillStyle = rgb(0.75, 0.78, 0.8); c.fillRect(0, 0, w, h); c.fillStyle = rgb(0.3, 0.32, 0.35); for (let x = 0; x < w; x += 16) c.fillRect(x, 0, 2, h); for (let y = 0; y < h; y += 16) c.fillRect(0, y, w, 2); });
+  cell('signCafe', 640, 128, (w, h) => { neon('КАФЕ 24', [1, 0.55, 0.1], 84, w, h * 0.7); c.shadowBlur = 0; c.fillStyle = rgb(1, 0.9, 0.6); c.textAlign = 'center'; fit('ДЛЯ ДАЛЬНОБОЙЩИКОВ', FN, 24, w * 0.8, 'bold'); c.fillText('ДЛЯ ДАЛЬНОБОЙЩИКОВ', w / 2, h - 18); });
+  cell('cafeWin', 256, 160, (w, h) => {
+    const g = c.createLinearGradient(0, 0, 0, h); g.addColorStop(0, '#f0d090'); g.addColorStop(1, '#a06838'); c.fillStyle = g; c.fillRect(0, 0, w, h);
+    c.fillStyle = '#5a3018'; c.fillRect(0, h - 46, w, 46); c.fillStyle = '#c03020'; for (let x = 10; x < w; x += 62) c.fillRect(x, h - 62, 44, 6);
+    c.fillStyle = 'rgba(30,20,10,.85)'; for (const [x, s] of [[40, 1], [150, 0.9], [205, 1.05]]) { c.beginPath(); c.arc(x, h - 92 * s, 15 * s, 0, TAU); c.fill(); c.fillRect(x - 22 * s, h - 76 * s, 44 * s, 40 * s); }
+    c.fillStyle = 'rgba(255,255,255,.18)'; c.fillRect(0, 0, w, 10);
+  });
+  cell('signFuel', 384, 64, (w, h) => neon('ТОПЛИВО', [0.2, 1, 0.4], 50, w, h));
+  sign('signBread', 384, 80, '#6a3a12', '#ffe0a0', 'ХЛЕБ');
+  cell('breadWin', 384, 192, (w, h) => {
+    c.fillStyle = '#e8d8b8'; c.fillRect(0, 0, w, h);
+    for (let y = 30; y < h; y += 52) { c.fillStyle = '#7a5a3a'; c.fillRect(0, y + 30, w, 6); for (let x = 12; x < w - 30; x += rr(34, 48)) { c.fillStyle = pick(['#b06a28', '#8a4a18', '#d09040', '#6a3410']); c.beginPath(); c.ellipse(x + 14, y + 20, rr(12, 18), rr(8, 11), 0, 0, TAU); c.fill(); } }
+  });
+  cell('signCoffee', 512, 96, (w, h) => neon('КОФЕ С СОБОЙ', [0.95, 0.85, 0.6], 70, w, h, FN));
+  cell('signMarket', 512, 96, (w, h) => neon('ПРОДУКТЫ', [0.2, 0.9, 1], 80, w, h));
+  sign('signFlowers', 384, 80, '#f4f0f4', '#b01060', 'ЦВЕТЫ', FN);
+  sign('parkSign', 512, 96, '#1a4a2a', '#f0e8c0', 'ПАРК КУЛЬТУРЫ И ОТДЫХА');
+  cell('plaque', 256, 128, (w, h) => { c.fillStyle = '#3a2a14'; c.fillRect(0, 0, w, h); c.strokeStyle = '#a08040'; c.lineWidth = 6; c.strokeRect(8, 8, w - 16, h - 16); c.fillStyle = '#d0b060'; c.textAlign = 'center'; fit('ОСНОВАТЕЛЮ', FB, 30, w - 40); c.fillText('ОСНОВАТЕЛЮ', w / 2, 56); fit('ГОРОДА', FB, 30, w - 40); c.fillText('ГОРОДА', w / 2, 94); });
+  sign('signStreet', 256, 48, '#1a3a80', '#fff', 'ул. Садовая', FN);
   cell('clockBig', 128, 128, (w) => {
     c.translate(w / 2, w / 2); c.fillStyle = '#f0ece0'; c.beginPath(); c.arc(0, 0, 60, 0, TAU); c.fill(); c.lineWidth = 6; c.strokeStyle = '#222'; c.stroke();
     for (let k = 0; k < 12; k++) { c.save(); c.rotate(k * PI / 6); c.fillStyle = '#222'; c.fillRect(-2, -54, 4, k % 3 ? 8 : 14); c.restore(); }

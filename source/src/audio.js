@@ -56,7 +56,7 @@ function mkSound(ac) {
   const room = BQ('lowpass', 16000, 0.5, out);
   const KIND = { tvroom: [2.5, 40, 0], music: [7, 70, 0.25], radio: [5, 40, 0.2], cook: [3.5, 25, 0.1], tv: [4, 30, 0.15], whistle: [14, 120, 0.6], dog: [45, 400, 1.4],
     hum: [3, 30, 0], creak: [7, 70, 0.7], scrape: [10, 90, 0.6], idle: [5, 45, 0.2], alarm: [35, 300, 1], drunk: [12, 110, 0.6], crow: [25, 220, 1], bell: [160, 700, 1.6],
-    xing: [30, 300, 0.8], drip: [2.5, 18, 0.3], lift: [3.5, 30, 0.2] };
+    xing: [30, 300, 0.8], drip: [2.5, 18, 0.3], lift: [3.5, 30, 0.2], club: [22, 320, 0.5], chat: [4.5, 45, 0.15], flag: [7, 60, 0.3] };
   const note = (m) => 440 * 2 ** ((m - 69) / 12);
   // an envelope on a gain: up in a, down over d
   const env = (p, t, a, v, d) => { p.setValueAtTime(0.0001, t); p.linearRampToValueAtTime(v, t + a); p.exponentialRampToValueAtTime(0.0001, t + a + d); };
@@ -94,6 +94,13 @@ function mkSound(ac) {
       const am = G(0.15, o.f); src(nb, 1.6, am); lfo(15.5, 0.2, am.gain);
     } else if (kind === 'alarm') {
       o.ag = G(0, lvl); o.ao = OSC('square', 800, BQ('bandpass', 1400, 1.5, o.ag));
+    } else if (kind === 'club') {
+      // the club: the music through its walls, only the low end gets out unless one stands at the door
+      o.f = BQ('lowpass', 260, 1.1, lvl);
+    } else if (kind === 'chat') {
+      // people talking outside: two voices taking turns, now and then a laugh
+      o.f = BQ('bandpass', 900, 0.6, lvl);
+      o.v = [140, 220].map((f) => { const g = G(0, o.f), vo = OSC('sawtooth', f, BQ('bandpass', 600, 5, g), BQ('bandpass', 1500, 7, g)); return { g, vo }; }); o.who = 0;
     } else if (kind === 'drunk') {
       // a man's voice through two formants, slurring from note to note
       o.vg = G(0, lvl); o.vo = OSC('sawtooth', 110, (o.f1 = BQ('bandpass', 600, 5, o.vg)), (o.f2 = BQ('bandpass', 1100, 7, o.vg)));
@@ -102,7 +109,7 @@ function mkSound(ac) {
   });
   // whistled phrases: a pentatonic walk, the same few motifs coming back
   const PENTA = [0, 2, 4, 7, 9, 12, 14, 16];
-  let dogT = ac.currentTime + 8;
+  let dogT = ac.currentTime + 8, forT = ac.currentTime + 5;
   // the salute: the same bursts as the sky shader draws (h33 there), heard d / 340 s later from the north-west
   const h33 = (x, y, z) => {
     let a = fract(x * 0.1031), b = fract(y * 0.1030), c = fract(z * 0.0973); const d = a * (b + 33.33) + b * (a + 33.33) + c * (c + 33.33); a += d; b += d; c += d;
@@ -238,6 +245,31 @@ function mkSound(ac) {
       } else if (o.kind === 'xing') {
         if (F[EVX] > 0) for (; o.next < ahead; o.next += 0.5) { tone('sine', 1250, o.next, 0.002, 0.5, 0.35, o.lvl); tone('sine', 2650, o.next, 0.002, 0.2, 0.2, o.lvl); }
         else o.next = 0;
+      } else if (o.kind === 'club') {
+        // four to the floor, a bass on the off-beats, open hats, a chord every two bars
+        o.f.frequency.setTargetAtTime(240 + 2600 / (1 + d * 0.35), t, 0.3);
+        const st = 60 / 126 / 4;
+        for (; o.next < ahead; o.next += st, o.step++) {
+          const s = o.step & 15, bar = (o.step >> 4) & 7, r = 33 + [0, 0, 3, 3, 5, 5, -2, -2][bar], a = o.next;
+          if (!(s & 3)) tone('sine', 150, a, 0.002, 1.1, 0.22, o.f, 40);
+          if ((s & 3) === 2) { tone('sawtooth', note(r), a, 0.004, 0.35, st * 1.7, o.f); burst(9000, 0.7, a, 0.07, 0.06, o.f, 'highpass'); }
+          if (s === 4 || s === 12) burst(1800, 0.9, a, 0.3, 0.12, o.f);
+          if (s === 0 && !(bar & 1)) for (const iv of [24, 27, 31]) tone('square', note(r + iv), a, 0.01, 0.05, st * 6, o.f);
+        }
+      } else if (o.kind === 'chat') {
+        for (; o.next < ahead; o.step++) {
+          const a = o.next, v = o.v[o.who];
+          if (o.step % 7 === 6) { v.g.gain.setTargetAtTime(0, a, 0.03); o.who ^= 1; o.next = a + rr(0.2, 0.9); continue; }
+          if (rnd() < 0.04) { // a laugh: short bursts falling in pitch
+            for (let k = 0; k < 4; k++) { const b = a + k * 0.16; v.vo.frequency.setValueAtTime(v.vo.frequency.value * 1.3 * (1 - k * 0.06), b); v.g.gain.setValueAtTime(0.45, b); v.g.gain.setTargetAtTime(0.02, b + 0.08, 0.02); }
+            o.next = a + 0.7; continue;
+          }
+          const dur = rr(0.08, 0.2); v.vo.frequency.setTargetAtTime((o.who ? 215 : 125) * rr(0.88, 1.18), a, 0.03);
+          v.g.gain.setTargetAtTime(rr(0.18, 0.4), a, 0.015); v.g.gain.setTargetAtTime(0.03, a + dur * 0.8, 0.02); o.next = a + dur;
+        }
+      } else if (o.kind === 'flag') {
+        // the cloth flapping and cracking in the gusts
+        for (; o.next < ahead; o.next += 0.06) if (rnd() < 0.15 + 0.6 * gu) burst(rr(250, 650), 1.2, o.next, 0.08 + 0.5 * gu * gu, rr(0.04, 0.1), o.lvl);
       } else if (o.kind === 'drunk') {
         // phrases of a song, slurred, then a pause
         for (; o.next < ahead; o.step++) {
@@ -270,6 +302,34 @@ function mkSound(ac) {
         burst(180, 0.8, a, 0.5, 0.6, salG, 'lowpass'); for (let k = 0; k < 18; k++) burst(rr(2000, 6000), 2, a + 0.3 + rr(0, 1.1), rr(0.04, 0.12), 0.02, salG);
       }
     } else salDone = -1;
+    // the forest: in among the trees now and then a wolf howls far off, an owl calls, a fox screams, a branch cracks
+    if (t > forT) {
+      const ci = clamp(floor((cx - OX) / CELLW), 2, CELLS - 3), cj = clamp(floor((cz - OZ) / CELLW), 2, CELLS - 3); let n = 0;
+      for (let j = cj - 2; j <= cj + 2; j++) for (let i = ci - 2; i <= ci + 2; i++) n += FORG[i + CELLS * j];
+      const fz = sstep(20, 70, n);
+      if (rnd() < fz) {
+        const p = pan(glass, G(1.2, wet)); p.pan.value = rr(-0.9, 0.9); const e = rnd(), a = t + 0.1;
+        if (e < 0.3) {
+          // a wolf, maybe two: a long voice rising and hanging
+          for (let w = 0; w < 1 + (rnd() < 0.5); w++) {
+            const b = a + w * rr(0.8, 2), f0 = rr(300, 380) * (w ? 1.12 : 1), dur = rr(3, 4.6), g = G(0, p), o1 = N(OscillatorNode, { type: 'sawtooth', frequency: f0 }, BQ('bandpass', 800, 4, g), BQ('bandpass', 1500, 6, g));
+            N(OscillatorNode, { frequency: 4.5 }, G(5, o1.frequency)).stop(b + dur + 0.1);
+            o1.frequency.setValueAtTime(f0, b); o1.frequency.linearRampToValueAtTime(f0 * 1.5, b + 0.9); o1.frequency.setValueAtTime(f0 * 1.5, b + dur * 0.65); o1.frequency.linearRampToValueAtTime(f0 * 0.95, b + dur);
+            g.gain.setValueAtTime(0, b); g.gain.linearRampToValueAtTime(0.18, b + 0.6); g.gain.setValueAtTime(0.18, b + dur * 0.7); g.gain.linearRampToValueAtTime(0, b + dur); o1.stop(b + dur + 0.1);
+          }
+        } else if (e < 0.6) {
+          // an owl: hoo ... hoo-hoo-hooo
+          for (const [dt, dd] of [[0, 0.5], [0.9, 0.18], [1.15, 0.18], [1.4, 0.7]]) tone('sine', rr(360, 400), a + dt, 0.06, 0.25, dd, BQ('lowpass', 900, 0.7, p), 330);
+        } else if (e < 0.75) {
+          // a fox: a harsh scream, two or three times
+          for (let k = 0; k < 2 + (rnd() < 0.5); k++) tone('sawtooth', rr(850, 1000), a + k * 0.7, 0.02, 0.22, 0.4, BQ('bandpass', 1400, 2, p), 520);
+        } else {
+          // a branch cracking under its snow, and the snow sliding off it
+          burst(rr(500, 1100), 0.8, a, 0.5, 0.05, p); burst(1500, 0.5, a + 0.06, 0.25, 0.9, p, 'lowpass');
+        }
+      }
+      forT = t + rr(4, 11);
+    }
     // dogs: now and then one howls or barks, and another may answer
     if (t > dogT) {
       const dogs = S.filter((o) => o.kind === 'dog');
