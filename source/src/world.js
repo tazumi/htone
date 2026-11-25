@@ -103,12 +103,17 @@ const APT = [[RU - RW, RU + RW, RD1, RD0], [43.87, 49, -4.9, -0.42], [40.35, 46.
 const ADOOR = [[0, -4.96, 41.3, 42.1, 2.0], [0, -4.96, 47.6, 48.4, 2.0], [1, 46.36, -6.2, -5.12, 2.1], [0, -6.36, 42.5, 43.3, 2.0], [0, -6.36, 44.1, 44.8, 2.0], [0, -6.36, 45.52, 46.3, 2.0]];
 // the windows besides the kitchen's: the living room's on the yard, the bedroom's at the back (wall, u along the yard side)
 const AWIN = [[0, 47.85], [1, 42.05]];
+// the door from the living room to the balcony of the bay next to its window (u from, to; the balcony's bay centre)
+const ABAL = [44.55, 45.35, 44.95];
+// the doors in the flat: u, z of the hinge, turn, seed, scale, how far open at first, its doorway (ADOOR; -1 the balcony's)
+const FDOOR = [[41.3, -4.93, 0, 0.1, 1, 1.45, 0], [47.6, -4.93, 0, 0.3, 1, 1.4, 1], [43.3, -6.39, PI, 0.5, 1, 1.25, 3], [44.8, -6.39, PI, 0.7, 1, 1.15, 4], [45.52, -6.33, 0, 0.9, 0.97, 0.4, 5], [ABAL[1], -0.4, PI, 0.2, 1, 0, -1]];
 const APTB = boxW(RU - RW, RY, -11.18, 49, RY + 2.62, RD0);
 // the boxes the camera may be in: each room, each doorway (through the wall and a little into both rooms), in the world
-const AFREE = APT.map(([u0, u1, z0, z1]) => boxW(u0, RY, z0, u1, RY + 2.62, z1)).concat(ADOOR.map(([k, c, a, b, h]) => (k ? boxW(c - 0.5, RY, a, c + 0.5, RY + h, b) : boxW(a, RY, c - 0.5, b, RY + h, c + 0.5))));
+const AFREE = APT.map(([u0, u1, z0, z1]) => boxW(u0, RY, z0, u1, RY + 2.62, z1)).concat(ADOOR.map(([k, c, a, b, h]) => (k ? boxW(c - 0.5, RY, a, c + 0.5, RY + h, b) : boxW(a, RY, c - 0.5, b, RY + h, c + 0.5))),
+  [boxW(ABAL[0], RY, -0.9, ABAL[1], RY + 2.1, 0.3), boxW(ABAL[2] - 1.08, RY, -0.05, ABAL[2] + 1.08, RY + 2.4, 1.03)]); // the balcony door and the balcony
 // the lights of the flat: they light only their own room (t = -2 - the room), and only inside the flat
 const ALAMP = [[1, 46.4, RY + 2.38, -2.66, 6.5, [2.6, 1.9, 1.05]], [1, 45.8, RY + 1.0, -4.3, 4.5, [0.3, 0.45, 1.0]], [2, 43.3, RY + 2.5, -5.66, 4.5, [1.1, 0.85, 0.5]], [3, 47.7, RY + 2.2, -6.7, 4.5, [1.5, 1.1, 0.6]],
-  [4, 40.52, RY + 0.8, -10.3, 4.5, [1.8, 1.1, 0.5]], [5, 45.26, RY + 2.0, -6.85, 4, [2.6, 2.5, 2.2]], [6, 45.91, RY + 2.25, -7.15, 2.5, [1.4, 1.1, 0.6]]];
+  [4, 40.52, RY + 0.8, -10.3, 4.5, [1.8, 1.1, 0.5]], [5, 45.26, RY + 2.0, -6.85, 4, [2.6, 2.5, 2.2]], [6, 45.91, RY + 2.25, -7.15, 2.5, [1.4, 1.1, 0.6]], [0, RU, RY + 2.4, -2.66, 5.5, [2.1, 1.65, 1.0]]];
 const AL0 = LAMPS.length, TVL2 = AL0 + 1;
 for (const [r, u, y, z, R, c] of ALAMP) { const p = toW(BLD[0], 0, u, y, z); LAMPS.push({ x: p[0], y: p[1], z: p[2], r: R, c, t: -2 - r }); }
 
@@ -168,12 +173,11 @@ function meshBuilding(b, room) {
     m.at(ox, 0, oz, a);
     for (let i = 0; i < pat.length; i++) {
       const u0 = i * bw, u1 = u0 + bw, uc = u0 + bw / 2, k = pat[i], holes = [], hb = bw / 2 - 0.3, dep = 1.15;
-      const mine = room && ((s === 0 && i === RSEC * 7 + RBAY) || AWIN.some(([ws, wu]) => ws === s && abs((s ? b.L - wu : wu) - uc) < 0.1));
+      const mine = room && ((s === 0 && i === RSEC * 7 + RBAY) || AWIN.some(([ws, wu]) => ws === s && abs((s ? b.L - wu : wu) - uc) < 0.1)), bal = room && s === 0 && abs(uc - ABAL[2]) < 0.1;
       if (k === 's') {
         // door, steps, canopy on two posts; the stair windows sit half a floor off the others
         holes.push([uc - 0.7, uc + 0.7, 0.13, 2.25, RD]);
         for (let f = 1; f < b.fl; f++) { const y = T.base + f * fh - 0.8; holes.push([uc - 0.6, uc + 0.6, y, y + 1.2, RD]); W.push([s, uc, y + 0.6, -RD, 1.2, 1.2, 2, 0]); }
-        m.mat(M_TINT).q4([uc - 0.7, 0.13, -RD], [uc + 0.7, 0.13, -RD], [uc + 0.7, 2.25, -RD], [uc - 0.7, 2.25, -RD], 0.7);
         m.mat(M_CONC).box(uc - 1.6, 2.5, 0, uc + 1.6, 2.64, 1.6, 0, 0.4, 1); m.box(uc - 1.6, 0, 0, uc + 1.6, 0.13, 1.7, 4, 0.7, 1);
         m.mat(M_METAL); m.bar([uc - 1.5, 0.13, 1.5], [uc - 1.5, 2.5, 1.5], 0.06); m.bar([uc + 1.5, 0.13, 1.5], [uc + 1.5, 2.5, 1.5], 0.06);
       } else {
@@ -187,13 +191,14 @@ function meshBuilding(b, room) {
             if (ihash(i, f, s + b.fl * 7) < 0.07 && !mine) m.mat(M_CONC).box(uc - 0.4, y0 + 0.3, 0.02, uc + 0.4, y0 + 0.85, 0.34, 16, 0.6, 1); // air conditioner
           } else if (k === 'b') {
             // balcony: slab, parapet, then glazing all round (most of them) or the open air and the window behind
-            const glazed = ihash(i, f, s + 31) < 0.72;
+            const own = bal && f === RFL, glazed = !own && ihash(i, f, s + 31) < 0.72;
+            if (own) holes.push([ABAL[0], ABAL[1], y0, y0 + 2.1, -RD0]);
             m.mat(M_CONC).box(uc - hb, y0 - 0.14, 0, uc + hb, y0, dep, 16, 0.45, 0.8);
             m.mat(panel ? M_PANEL : M_TINT).box(uc - hb, y0, dep - 0.06, uc + hb, y0 + 1, dep, 0, 0.7, 1);
             m.box(uc - hb, y0, 0, uc - hb + 0.06, y0 + 1, dep - 0.06, 16 | 32, 0.7, 1); m.box(uc + hb - 0.06, y0, 0, uc + hb, y0 + 1, dep - 0.06, 16 | 32, 0.7, 1);
             if (glazed) {
               W.push([s, uc, y0 + 1.72, dep - 0.03, hb * 2, 1.44, 1, 0], [s, uc - hb + 0.03, y0 + 1.72, dep / 2, dep, 1.44, 1, -PI / 2], [s, uc + hb - 0.03, y0 + 1.72, dep / 2, dep, 1.44, 1, PI / 2]);
-            } else W.push([s, uc, y0 + 1.6, 0.03, 2, 1.7, 0, 0]);
+            } else if (!own) W.push([s, uc, y0 + 1.6, 0.03, 2, 1.7, 0, 0]);
             if (f === b.fl - 1) m.mat(M_METAL).box(uc - hb - 0.06, y0 + 2.44, 0, uc + hb + 0.06, y0 + 2.5, dep + 0.08, 16);
           }
         }
@@ -279,7 +284,12 @@ function meshRoom(r) {
   const winsAt = (front) => AWIN.filter(([ws, wu]) => ws === (front ? 0 : 1) && wu > u0 && wu < u1).map(([ws, wu]) => [wu - 0.725, wu + 0.725, y0 + 0.95, y0 + 2.45]);
   if (r === 0) { face(0, z0, u0, u1, doorsAt(0, z0, u0, u1)); return m; }
   face(0, z0, u0, u1, doorsAt(0, z0, u0, u1).concat(z0 < -11 ? winsAt(false) : []));
-  face(0, z1, u0, u1, doorsAt(0, z1, u0, u1).concat(z1 > -0.5 ? winsAt(true) : []));
+  const balc = r === 1 ? [[ABAL[0], ABAL[1], y0, y0 + 2.1]] : [];
+  face(0, z1, u0, u1, doorsAt(0, z1, u0, u1).concat(z1 > -0.5 ? winsAt(true) : [], balc));
+  for (const [a, b] of balc) {
+    m.mat(M_BARK).box(a, y0, z1, b, y0 + 0.04, 0, 0, 0.7, 1);
+    m.mat(M_TINT); for (const [p0, p1] of [[a - 0.07, a], [b, b + 0.07]]) m.box(p0, y0, z1 - 0.015, p1, y0 + 2.17, z1, 0, 1, 1); m.box(a - 0.07, y0 + 2.1, z1 - 0.015, b + 0.07, y0 + 2.17, z1, 0, 1, 1);
+  }
   face(1, u0, z0, z1, doorsAt(1, u0, z0, z1)); face(1, u1, z0, z1, doorsAt(1, u1, z0, z1));
   // floor and ceiling
   m.mat(wet ? M_TINT : M_BARK).q4([u0, y0, z0], [u1, y0, z0], [u1, y0, z1], [u0, y0, z1], 0.85);
@@ -518,6 +528,28 @@ const PROPS = {
     for (let x = -567; x <= 567; x += 45) { m.bar([x, 0, -3.2], [x, 7.2, -3.2], 0.22); m.bar([x, 6.6, -3.2], [x, 6.6, 0.3], 0.1); }
     m.bar([-576, 6.1, 0], [576, 6.1, 0], 0.03); return m;
   },
+  entLeaf() { // the entrance door of a house from outside: the leaf (x 0..0.9 from its hinge, its face at z 0.05) that
+    // opens, and the narrow leaf beside it that stays (x 0.905..1.4); the frame of the doorway is the house's
+    const m = new Mesh().mat(M_PAINT);
+    m.box(0, 0, 0, 0.9, 2.12, 0.05, 0, 0.8, 1); m.box(0.905, 0, 0, 1.4, 2.12, 0.05, 0, 0.8, 1);
+    for (const [x0, x1] of [[0.1, 0.8], [1.0, 1.31]]) { m.box(x0, 0.2, 0.05, x1, 0.95, 0.07, 0, 0.7, 1); m.box(x0, 1.15, 0.05, x1, 1.95, 0.07, 0, 0.7, 1); }
+    m.mat(M_METAL); m.box(0.76, 0.98, 0.05, 0.84, 1.04, 0.1, 0, 0.6, 1); m.box(0.8, 0.98, 0.1, 0.83, 1.18, 0.12, 0, 0.6, 1);
+    for (const y of [0.3, 1.8]) m.box(-0.02, y, -0.01, 0.03, y + 0.14, 0.06, 0, 0.5, 1);
+    return m;
+  },
+  entHall() { // behind the doorway: the lobby of the stairs, lit by its bulb (the shader's light, see anim 15), going 1.9 m in
+    // (x 0..1.4 across the doorway, z < 0 into the house, the floor at the sill); mailboxes, the first flight up
+    const m = new Mesh().mat(M_LAMP), D = -1.9, Y = 2.12;
+    m.q4([0, 0, -0.01], [1.4, 0, -0.01], [1.4, 0, D], [0, 0, D], [0.55, 0.55, 0.3, 0.3]);
+    m.q4([0, Y, D], [1.4, Y, D], [1.4, Y, -0.01], [0, Y, -0.01], [0.5, 0.5, 0.75, 0.75]);
+    m.q4([0, 0, D], [0, 0, -0.01], [0, Y, -0.01], [0, Y, D], [0.45, 0.6, 0.85, 0.65]);
+    m.q4([1.4, 0, -0.01], [1.4, 0, D], [1.4, Y, D], [1.4, Y, -0.01], [0.6, 0.45, 0.65, 0.85]);
+    m.q4([1.4, 0, D], [0, 0, D], [0, Y, D], [1.4, Y, D], [0.4, 0.4, 0.8, 0.8]);
+    // the flight up along the back, its steps lit on their treads; the mailboxes on the left wall; a green dado
+    for (let k = 0; k < 6; k++) m.box(0.3, k * 0.16, D + 0.02, 1.4, (k + 1) * 0.16, D + 0.5 - k * 0.0, 2 | 8, 0.95 - k * 0.04, 0.5);
+    for (let k = 0; k < 3; k++) m.box(0.01, 1.15 + k * 0.2, -1.35, 0.12, 1.33 + k * 0.2, -0.55, 1 | 2, 0.35, 0.55);
+    return m;
+  },
 };
 
 // ---------------------------------------------------------------- the world: instances, windows, grass, sprites, baked maps
@@ -541,14 +573,17 @@ function makeWorld() {
       an = 12; ts = P[0]; if (!seed) seed = rnd();
       for (let k = 1; k < P.length; k++) { const [mx, my, mz, fa] = P[k], [dx, dz] = rotY(mx * sc, mz * sc, yaw), h = (((yaw + fa) % TAU) + TAU) % TAU; steam.push(x + dx, y + my * sc, z + dz, 0.045, rnd(), rr(0.24, 0.32), -1 - h, rr(0.3, 0.4)); }
     }
+    if ((an === 7 && fract(ts) < 0.3) || an === 10 || an === 11) walk7.push([x, y, z, yaw, floor(ts), /dog|wolf|fox|hare/.test(name)]);
     const q = qYaw(yaw), i = id[name]; inst[i].push(x, y, z, sc, q[0], q[1], q[2], q[3], pal, seed, ts, an); instZ[i].push(zoneOf(x, z));
   };
   const lod = (m) => { LODM = m; };
+  const walk7 = []; // x, y, z, yaw, length, paws: the ways of those walking to and fro (anim 7) and of the animals (10, 11)
   const wins = [], winB = [], boxes = [], rects = [], snd = [], thaw = [], bare = []; // bare: x0, z0, x1, z1 where no grass grows // winB: building * 4 + wall of each pane; snd: sounds in the world [kind, x, y, z] // rects: footprints for the ground map [cx, cz, hx, hz, yaw, weight]
   const blades = Array.from({ length: nCells }, () => []);
   const glare = [], steam = [], paper = [], decals = []; // decals: x, y, z, yaw, w, h, mode, glow, atlas cell
 
-  for (const k in PROPS) reg(k, PROPS[k](), { noSh: k === 'wagon' || k === 'bulb' });
+  for (const k in PROPS) reg(k, PROPS[k](), { noSh: ['wagon', 'bulb', 'entHall'].includes(k) });
+  for (const k in PROPS8) { const r = PROPS8[k](); reg(k, r.build ? r : r.m, { noSh: ['tram', 'kid', 'kidSled', 'taxiSign'].includes(k) }); }
   for (const k in PROPS2) reg(k, PROPS2[k]());
   // props4: the yard and street props; props5: vehicles, people and animals (walkers cast no baked shadow: they move)
   for (const k in PROPS4) reg(k, PROPS4[k](), { noSh: ['bag'].includes(k) });
@@ -614,7 +649,7 @@ CARS.forEach((c, t) => reg('car' + t, meshCar(t)));
   // --- props
   POLES.forEach(([x, z, a], i) => { solid('lamp', x, 0, z, a, 0, i); boxes.push([x - 0.2, z - 0.2, x + 0.2, z + 0.2, 9]); });
   LAMPS.forEach((l, i) => {
-    if (l.t < 0) solid('bulb', l.x, l.y + 0.12, l.z, 0, 0, i);
+    if (l.t < 0 && !l.nb) solid('bulb', l.x, l.y + 0.12, l.z, 0, 0, i);
     // glare: a cold star on the street lamps, a small warm dot on the bulbs
     glare.push(l.x, l.y - (l.t < 0 ? 0 : 0.06), l.z, l.t < 0 ? 0.5 : 1.5, 0, 0, 0, 100 + i);
   });
@@ -648,9 +683,9 @@ CARS.forEach((c, t) => reg('car' + t, meshCar(t)));
     dec(RU + RW - 0.006, RY + 2.0, -2.6, -PI / 2, 0.32, 0.32, 0, 0, 'clock');
     dec(RU + RW - 0.006, RY + 1.45, -3.6, -PI / 2, 0.36, 0.5, 0, 0, 'calendar');
     { const p = at(RU + 0.18, RY + 0.86, -0.95); for (let k = 0; k < 6; k++) steam.push(p[0], p[1], p[2], rr(0.03, 0.05), rnd(), rr(0.25, 0.35), 0.35, rr(0.3, 0.6)); }
-    { const p = at(RU - RW + 0.36, RY + 1.04, -1.07); for (let k = 0; k < 5; k++) steam.push(p[0], p[1], p[2], rr(0.035, 0.06), rnd(), rr(0.3, 0.4), 0.45, rr(0.4, 0.8)); }
-    for (const [u, c] of [[RU - RW + 0.17, -1.07]]) { const p = at(u, RY + 0.87, c); glare.push(p[0], p[1], p[2], 0.12, 0.25, 0.45, 1.6, 0); }
-    { const p = at(TVU - 0.3, TVY, TVZ); snd.push(['tvroom', p[0], p[1], p[2]]); }
+    { const p = at(RU - RW + 0.36, RY + 1.04, -1.07); for (let k = 0; k < 9; k++) steam.push(p[0], p[1], p[2], -rr(0.035, 0.06), rnd(), rr(0.3, 0.45), 0.5, rr(0.4, 0.9)); } // the kettle's: as much as main.js says
+    for (const [u, c] of [[RU - RW + 0.17, -1.07]]) { const p = at(u, RY + 0.87, c); glare.push(p[0], p[1], p[2], 0.12, 0.25, 0.45, 1.6, 12); }
+    { const p = at(TVU - 0.3, TVY, TVZ); snd.push(['tvroom', p[0], p[1], p[2], 0, 0]); }
 
     // --- the rest of the flat: the rooms (wallpaper of a palette and a pattern each), the doors, the furniture under its
     //     lamps, the television in the wall unit with its sound
@@ -662,8 +697,8 @@ CARS.forEach((c, t) => reg('car' + t, meshCar(t)));
     const yc = RY + 2.62, L = (i) => AL0 + i;
     // the living room: the wall unit with the television, the sofa under the carpet, the table on the rug, an armchair, the piano
     { const W = put('wallUnit', 45.5, -4.9, 0, 8, 0.4), T = put('tvSet', 45.5 + W.tv[0], -4.9 + W.tv[2], 0, 0, 0.2, RY + W.tv[1]);
-      dec(45.5 + W.tv[0] + T.screen[0], RY + W.tv[1] + T.screen[1], -4.9 + W.tv[2] + T.screen[2] + 0.006, 0, T.w, T.h, 3, 1.4, 'tvimg');
-      const p = at(45.8, RY + 1.0, -4.4); snd.push(['tvroom', p[0], p[1], p[2]]); }
+      dec(45.5 + W.tv[0] + T.screen[0], RY + W.tv[1] + T.screen[1], -4.9 + W.tv[2] + T.screen[2] + 0.006, 0, T.w, T.h, 6, 1.4, 'tvimg');
+      const p = at(45.8, RY + 1.0, -4.4); snd.push(['tvroom', p[0], p[1], p[2], 0, 1]); }
     put('sofa', 43.87, -2.6, PI / 2, 9, 0.3); put('wallCarpet', 43.875, -2.6, PI / 2, 0, 0.5, RY + 0.95); dec(43.875 + 0.027, RY + 1.65, -2.6, PI / 2, 1.9, 1.3, 0, 0, 'carpet');
     put('rug', 45.9, -2.7, PI / 2, 0, 0.6); put('coffeeTable', 45.5, -2.6, PI / 2, 0, 0.2);
     put('armchair', 48.25, -1.5, -2.45, 9, 0.7); put('floorLamp', 44.3, -0.95, 0, 6, L(0)); put('plant', 46.55, -0.95, 0.4, 7, 0.4);
@@ -681,9 +716,30 @@ CARS.forEach((c, t) => reg('car' + t, meshCar(t)));
     put('bathtub', 44.51, -8.6, 0, 13, 0.2); put('washbasin', 45.4, -7.25, -PI / 2, 2, 0.4); put('washer', 43.62, -7.3, PI / 2, 0, 0.3);
     put('towelRail', 43.62, -7.3, PI / 2, 11, 0.5, RY + 0.35); put('bathMat', 44.5, -7.6, 0, 7, 0.2); put('wallLamp', 45.4, -6.8, -PI / 2, 0, L(5), RY + 2.0);
     put('toilet', 45.91, -7.9, 0, 13, 0.3); put('ceilingBulb', 45.91, -7.15, 0, 0, L(6), yc);
-    // the doors, open or ajar
-    put('intDoor', 41.3, -4.93, 0, 13, 0.1, RY, 1, 1.45); put('intDoor', 47.6, -4.93, 0, 13, 0.3, RY, 1, 1.4);
-    put('intDoor', 43.3, -6.39, PI, 13, 0.5, RY, 1, 1.25); put('intDoor', 44.8, -6.39, PI, 13, 0.7, RY, 1, 1.15); put('intDoor', 45.52, -6.33, 0, 13, 0.9, RY, 0.97, 0.4);
+    // the doors, open or ajar at first: each turns on its hinge by its slot (anim 16); the balcony's is shut
+    const k7 = f7('intDoor', 0);
+    for (const [u, z, dir, sd, sc, open, ad] of FDOOR) {
+      const o = slot(() => 0), p = at(u, RY, z, dir); ACT[o * 8 + 6] = open; FLAT.doors.push({ o, open, ad, want: open > 0.05 });
+      solid(k7, p[0], p[1], p[2], p[3], 13, sd, o, 16, sc);
+      const q = ad < 0 ? at(ABAL[2], RY + 1.1, -0.3) : ADOOR[ad][0] ? at(ADOOR[ad][1], RY + 1.1, (ADOOR[ad][2] + ADOOR[ad][3]) / 2) : at((ADOOR[ad][2] + ADOOR[ad][3]) / 2, RY + 1.1, ADOOR[ad][1]);
+      USE.push({ p: [q[0], q[1], q[2]], r: 0.55, kind: 'door', i: FLAT.doors.length - 1 });
+    }
+    put('plafond', RU, -2.66, 0, 0, L(7), yc);
+    // the switches: one by the door of each room, on the room's side
+    APT.forEach(([u0, u1, z0, z1], r) => {
+      const d = ADOOR.find(([k, c, a, b]) => (k ? (abs(c - u0) < 0.1 || abs(c - u1) < 0.1) && a >= z0 - 0.01 && b <= z1 + 0.01 : (abs(c - z0) < 0.1 || abs(c - z1) < 0.1) && a >= u0 - 0.01 && b <= u1 + 0.01));
+      if (!d) return; const [k, c, , b] = d, side = k ? (c > (u0 + u1) / 2 ? -1 : 1) : (c > (z0 + z1) / 2 ? -1 : 1), cf = c + side * 0.075, q = k ? at(cf, RY + 0.93, b + 0.16) : at(b + 0.16, RY + 0.93, cf);
+      USE.push({ p: [q[0], q[1], q[2]], r: 0.2, kind: 'light', i: r });
+    });
+    // the televisions and the stove under the kettle
+    { const q = at(TVU - 0.28, TVY, TVZ); USE.push({ p: [q[0], q[1], q[2]], r: 0.3, kind: 'tv', i: 0 }); }
+    { const q = at(45.5, RY + 1.1, -4.6); USE.push({ p: [q[0], q[1], q[2]], r: 0.4, kind: 'tv', i: 1 }); }
+    { const q = at(RU - RW + 0.3, RY + 0.98, -1.07); USE.push({ p: [q[0], q[1], q[2]], r: 0.3, kind: 'kettle', i: 0 }); }
+    // what the flat sounds like: the fridge, the tap in the bathroom, the neighbours above and through the wall, the lift
+    // and the stairs behind the front door, the kettle on the stove
+    for (const [kind, u, y, z] of [['fridge', RU + RW - 0.35, 0.9, -4.5], ['tap', 45.2, 0.9, -7.25], ['neigh', 46, 2.9, -3], ['neigh', 49.4, 1.4, -2.4], ['liftin', 49.6, 1.2, -7.2], ['kettle', RU - RW + 0.36, 1.0, -1.07]]) { const p = at(u, RY + y, z); snd.push([kind, p[0], p[1], p[2]]); }
+    // on the balcony: old skis, the jars of pickles, a sled
+    for (const [nm, u, z, dir, pal] of [['skis', 44.05, 0.02, 0, 0], ['jars', 45.55, 0.3, 0.1, 0], ['sled', 45.8, 0.72, 0.2, 5]]) { const p = at(u, RY, z, dir); solid(nm, p[0], p[1], p[2], p[3], pal, 0.4); }
   }
 
   // --- by every door: the intercom (lit), the plate with the flat numbers, and what the youth of the yard wrote
@@ -804,6 +860,17 @@ CARS.forEach((c, t) => reg('car' + t, meshCar(t)));
   town({ solid, reg, wins, winB, made, decals, glare, steam, snd, boxes, rects, grassY, thaw, bare });
   // --- the town round the estate: its districts, streets, park and forest (districts.js)
   districts({ solid, reg, lod, wins, winB, made, decals, glare, steam, snd, boxes, rects, grassY, thaw, bare, paper });
+  // --- what moves about on its own: the traffic, people going from door to door, the dogs (life.js)
+  life({ solid, reg, glare, steam, snd, boxes, grassY, decals, wins, has: (n) => n in id });
+  // --- footprints in the snow along every way somebody walks or something runs: the walkers going to and fro, the
+  //     animals of the forest, the people and dogs of life.js (decal mode 7: the shader shows them where snow lies)
+  {
+    const fp = (x, y, z, a, paws) => { if ((x > APTB[0] && x < APTB[3] && z > APTB[2] && z < APTB[5] && y > APTB[1] - 1) || boxes.some((h) => x > h[0] && x < h[2] && z > h[1] && z < h[3] && h[4] > 2)) return; decals.push(x, y + 0.012, z, a, paws ? 0.3 : 0.42, paws ? 1 : 1.4, 7, 0, paws ? 'paws' : 'steps'); };
+    for (const [x, y, z, a, L, paws] of walk7) { const st = paws ? 1 : 1.4, [dx, dz] = rotY(0, 1, a); for (let s = st / 2; s < L; s += st) { const px = x + dx * s, pz = z + dz * s; fp(px, max(y, grassY(px, pz), onStreet(px, pz) ? ST_Y : 0), pz, a, paws); } }
+    for (const [P, paws] of TRAILS) { const st = paws ? 1 : 1.4; for (let s = 1.6; s < P.L - (P.closed ? 0 : 1.6); s += st) { const u = s / P.L * (P.N - 1), i = min(floor(u), P.N - 2), dx = P.X[i + 1] - P.X[i], dz = P.Z[i + 1] - P.Z[i]; fp(mix(P.X[i], P.X[i + 1], u - i), mix(P.Y[i], P.Y[i + 1], u - i), mix(P.Z[i], P.Z[i + 1], u - i), atan2(dx, dz), paws); } }
+  }
+  // --- every entrance door: the leaf (anim 15: life.js opens some through their slots, the rest stay shut) and the lobby
+  DOORS.forEach(([, , , bi, , uc], di) => { const b = BLD[bi], p = toW(b, 0, uc - 0.7, 0.13, -0.22), o = DSLOT[di] || 0; solid('entHall', p[0], p[1], p[2], p[3], 0, di, o, 15); solid('entLeaf', p[0], p[1], p[2], p[3], b.pal, di, o, 15); });
 
   // --- cars
   rseed(5);

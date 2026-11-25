@@ -14,6 +14,9 @@ const STREETS = [
   [254, -134, 266, 160], [266, -66, 520, -54], [266, 54, 520, 66], [266, -54, 394, 54], [415, 66, 485, 104], [300, -79, 340, -66], [448, -83, 488, -66], [296, 66, 344, 72], // the centre
   [116, 280, 128, 576], [-235, 294, 420, 306], [128, 395, 400, 407], [160, 370, 400, 382], [160, 426, 400, 438], [128, 495, 330, 507], // south of the river
   [186, 88, 212, 100], [200, 50, 212, 88], [212, 50, 254, 62], // from the foot of the bridge's north ramp to the avenue
+  [-520, -66, -508, 36], [508, -66, 520, 66], [400, 306, 412, 407], // the ends of the blocks joined, so the traffic goes round (life.js)
+  [485, 79, 576, 91], // the hospital's road out of town to the east
+  [274, -131, 295, -110], [274, 141, 295, 162], // the tram's turning loops at the ends of the avenue
 ];
 // the bridge's north end turns east and comes down to the ground on a ramp: x0, z0, x1, z1 (the corner over the bridge's end
 // and the ramp itself); nothing grows on them
@@ -21,7 +24,7 @@ const RAMPN = [116, 88, 186, 100];
 const ST_Y = 0.215; // the top of the streets
 const onStreet = (x, z, m = 0) => STREETS.some((s) => x > s[0] - m && x < s[2] + m && z > s[1] - m && z < s[3] + m);
 // where the forest does not grow: the districts, the park, the roads, the river and the railway
-const NOFOREST = [[-525, -140, -236, 140], [-512, -140, -388, -95], [200, -140, 500, 168], [-242, 286, 72, 492], [72, 316, 112, 480], [126, 286, 408, 482], [126, 482, 336, 545], [108, 212, 136, 576], [-242, 288, 425, 312]];
+const NOFOREST = [[-525, -140, -236, 140], [-512, -140, -388, -95], [200, -140, 524, 168], [-242, 286, 72, 492], [72, 316, 112, 480], [126, 286, 408, 482], [126, 482, 336, 545], [108, 212, 136, 576], [-242, 288, 425, 312]];
 // the park's lake: centre and radii
 const LAKE = [-90, 395, 80, 50];
 // the alleys of the park (polylines): from the gate to the lake, round the lake, to the wheel and to the bandstand

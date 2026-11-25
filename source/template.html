@@ -117,6 +117,13 @@ svg { width: 1.4em; height: 1.4em; fill: currentColor; }
 }
 .g #o { display: flex; }
 .p #o { display: none; }
+/* what F would use, under the middle of the view */
+#u {
+  position: absolute; left: 0; right: 0; bottom: 22%; text-align: center; font-size: .8em; letter-spacing: .12em;
+  text-transform: uppercase; text-shadow: 0 1px 6px #000; opacity: .85; pointer-events: none;
+}
+body:not(.g) #u { visibility: hidden; }
+#v { background: #07060ab3; box-shadow: inset 0 0 0 2px #ffc98a66; color: #e9e4dc; }
 #i {
   position: absolute; top: 1em; left: 1.2em; margin: 0; font: .8em/1.6 ui-monospace, Consolas, monospace;
   white-space: pre-wrap; text-shadow: 0 1px 4px #000; pointer-events: none;
@@ -131,6 +138,7 @@ svg { width: 1.4em; height: 1.4em; fill: currentColor; }
     <div id=l><div id=p><i id=b></i></div><p id=s>{{night}}</p><p id=w hidden>{{chrome}}</p></div>
     <div id=g>
       <button id=d>{{go}}</button>
+      <button id=v>{{tour}}</button>
       <p id=q><span>{{detail}}</span><button>{{low}}</button><button>{{medium}}</button><button>{{high}}</button></p>
       <div id=k>
         <p>
@@ -143,6 +151,8 @@ svg { width: 1.4em; height: 1.4em; fill: currentColor; }
           <i><b>Esc</b></i>{{menu}}
           <i><b>M</b></i>{{sound}}
           <i><b>H</b></i>{{stats}}
+          <i><b>F</b></i>{{use}}
+          <i><b>T</b></i>{{tour}}
         </p>
       </div>
       <p id=h>{{touch}}</p>
@@ -152,6 +162,7 @@ svg { width: 1.4em; height: 1.4em; fill: currentColor; }
 </div>
 <button id=o aria-label="{{menu}}">≡</button>
 <pre id=i></pre>
+<p id=u></p>
 <script>
 /*SCRIPT*/
 </script>

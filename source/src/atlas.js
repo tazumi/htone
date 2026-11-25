@@ -153,6 +153,15 @@ function makeAtlas() {
     c.fillStyle = '#b02020'; c.fillRect(0, 0, w, 40); c.fillStyle = '#f2efe6'; c.fillRect(6, 40, w - 12, h - 46); c.fillStyle = '#fff'; c.font = `bold 22px ${FN}`; c.textAlign = 'center'; c.fillText('НОЯБРЬ', w / 2, 28);
     c.fillStyle = '#c02020'; c.font = `bold 72px ${FN}`; c.fillText('24', w / 2, 118); c.fillStyle = '#333'; c.font = `18px ${FN}`; c.fillText('вторник', w / 2, 150);
   });
+  // ---- footprints in the snow: boots, a step to each side every 0.7 m (the cell is 1.4 m long), and a dog's paws (1 m)
+  cell('steps', 64, 256, (w, h) => {
+    c.shadowColor = 'rgba(0,0,0,.9)'; c.shadowBlur = 4; c.fillStyle = 'rgba(0,0,0,.85)';
+    for (const [x, y] of [[20, 50], [44, 178]]) { const a = rr(-0.12, 0.12); c.save(); c.translate(x, y); c.rotate(a); c.beginPath(); c.ellipse(0, -10, 10, 20, 0, 0, TAU); c.fill(); c.beginPath(); c.ellipse(0, 22, 8.5, 10, 0, 0, TAU); c.fill(); c.restore(); }
+  });
+  cell('paws', 48, 256, (w, h) => {
+    c.shadowColor = 'rgba(0,0,0,.9)'; c.shadowBlur = 2; c.fillStyle = 'rgba(0,0,0,.85)';
+    for (let k = 0; k < 4; k++) { const x = k & 1 ? 30 : 18, y = 32 + k * 64; c.beginPath(); c.ellipse(x, y + 5, 6.5, 6, 0, 0, TAU); c.fill(); for (const [dx, dy] of [[-6, -5], [-2.2, -9.5], [2.2, -9.5], [6, -5]]) { c.beginPath(); c.arc(x + dx, y + dy, 2.8, 0, TAU); c.fill(); } }
+  });
   // ---- the rest of the flat: the carpet on the living room wall, a landscape in a frame in the corridor
   cell('carpet', 320, 224, (w, h) => {
     c.fillStyle = '#6e1410'; c.fillRect(0, 0, w, h);

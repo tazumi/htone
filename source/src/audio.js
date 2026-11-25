@@ -35,6 +35,8 @@ function mkSound(ac) {
   const wind = G(0, glass), windF = BQ('bandpass', 400, 0.6, wind), low = G(0.09, glass), whis = G(0, glass), whisF = BQ('bandpass', 1100, 24, whis);
   src(nw, 1, windF, whisF); src(nb, 1, BQ('lowpass', 170, 0.7, low)); lfo(0.07, 0.05, low.gain); lfo(0.19, 0.25, G(60, whisF.frequency));
   // the town: far traffic and machinery, too low to place
+  // a blizzard moans round the corners
+  const howl = G(0, glass), howlF = BQ('bandpass', 380, 3, howl); src(nb, 1.9, howlF); lfo(0.11, 120, howlF.frequency);
   const hum = G(0.2, glass); src(nb, 0.61, BQ('lowpass', 75, 0.7, hum)); lfo(0.031, 0.05, hum.gain);
   // the highway: each slot a band of tyre noise and an engine that only the big ones make heard
   const cars = Array.from({ length: NRC }, () => { const p = pan(glass), g = G(0, p), f = BQ('bandpass', 600, 0.8, g), eg = G(0, p), eo = OSC('sawtooth', 50, BQ('lowpass', 180, 1, eg)); return { p, g, f, eg, eo }; });
@@ -56,15 +58,22 @@ function mkSound(ac) {
   const room = BQ('lowpass', 16000, 0.5, out);
   const KIND = { tvroom: [2.5, 40, 0], music: [7, 70, 0.25], radio: [5, 40, 0.2], cook: [3.5, 25, 0.1], tv: [4, 30, 0.15], whistle: [14, 120, 0.6], dog: [45, 400, 1.4],
     hum: [3, 30, 0], creak: [7, 70, 0.7], scrape: [10, 90, 0.6], idle: [5, 45, 0.2], alarm: [35, 300, 1], drunk: [12, 110, 0.6], crow: [25, 220, 1], bell: [160, 700, 1.6],
-    xing: [30, 300, 0.8], drip: [2.5, 18, 0.3], lift: [3.5, 30, 0.2], club: [22, 320, 0.5], chat: [4.5, 45, 0.15], flag: [7, 60, 0.3] };
+    xing: [30, 300, 0.8], drip: [2.5, 18, 0.3], lift: [3.5, 30, 0.2], club: [22, 320, 0.5], chat: [4.5, 45, 0.15], flag: [7, 60, 0.3],
+    // riding with the actors of life.js
+    tyres: [6, 80, 0.15], engine: [8, 110, 0.2], plough: [12, 160, 0.4], siren: [45, 500, 1.1], tram: [12, 180, 0.4], steps: [2.5, 22, 0], bark: [45, 400, 1.4],
+    // the new places, and the flat (heard from inside it: see IN)
+    fire: [3, 30, 0.1], rinkmusic: [16, 230, 0.7], kids: [10, 120, 0.5], fridge: [1.6, 12, 0], tap: [1.4, 10, 0], neigh: [3, 18, 0], liftin: [3, 20, 0], kettle: [1.8, 14, 0] };
+  // what is in the flat: through the room's bus, muffled from outside
+  const IN = ['tvroom', 'fridge', 'tap', 'neigh', 'liftin', 'kettle'];
   const note = (m) => 440 * 2 ** ((m - 69) / 12);
   // an envelope on a gain: up in a, down over d
   const env = (p, t, a, v, d) => { p.setValueAtTime(0.0001, t); p.linearRampToValueAtTime(v, t + a); p.exponentialRampToValueAtTime(0.0001, t + a + d); };
   // a short voice: oscillator of type `ty` at f through `to`, enveloped, stopping by itself
   const tone = (ty, f, t, a, v, d, to, f2) => { const g = G(0, to), o = N(OscillatorNode, { type: ty, frequency: f }, g); if (f2) o.frequency.exponentialRampToValueAtTime(f2, t + a + d); env(g.gain, t, a, v, d); o.stop(t + a + d + 0.05); return o; };
   const burst = (f, q, t, v, d, to, type = 'bandpass') => { const g = G(0, to), s = N(AudioBufferSourceNode, { buffer: nw, playbackRate: 1 }, BQ(type, f, q, g)); s.stop(t + d + 0.05); env(g.gain, t, 0.002, v, d); };
-  const S = Wd.snd.map(([kind, x, y, z, w], i) => {
-    const [R, far, wv] = KIND[kind], p = kind === 'tvroom' ? pan(room) : pan(glass, G(wv, wet)), lvl = G(0, p), o = { kind, x, y, z, w, R, far, p, lvl, next: 0, step: 0, seed: i * 7.31 + 1, on: 0 };
+  // the sounds of the world (Wd.snd: kind, x, y, z, a walker, which television), then those riding with an actor (ASND)
+  const S = Wd.snd.concat(ASND.map(([kind, a]) => [kind, 0, 0, 0, 0, -1, a])).map(([kind, x, y, z, w, tv = -1, a = 0], i) => {
+    const [R, far, wv] = KIND[kind], p = IN.includes(kind) ? pan(room) : pan(glass, G(wv, wet)), lvl = G(0, p), o = { kind, x, y, z, w, tv, a, R, far, p, lvl, next: 0, step: 0, seed: i * 7.31 + 1, on: 0, px: 0, pz: 0, v: 0 };
     if (kind === 'music') {
       // inside a closed car: only the bass and the thump come through
       o.f = BQ('lowpass', 420, 1.2, lvl); o.bpm = i & 1 ? 100 : 92; o.key = i & 1 ? 45 : 43;
@@ -101,6 +110,32 @@ function mkSound(ac) {
       // people talking outside: two voices taking turns, now and then a laugh
       o.f = BQ('bandpass', 900, 0.6, lvl);
       o.v = [140, 220].map((f) => { const g = G(0, o.f), vo = OSC('sawtooth', f, BQ('bandpass', 600, 5, g), BQ('bandpass', 1500, 7, g)); return { g, vo }; }); o.who = 0;
+    } else if (kind === 'tyres' || kind === 'engine' || kind === 'plough') {
+      // tyres on the wet street; a diesel under them for the bus and the plough, the blade scraping for the plough
+      o.f = BQ('bandpass', 520, 0.7, lvl); src(nw, 0.77 + i * 0.003, G(kind === 'tyres' ? 0.5 : 0.35, o.f));
+      if (kind !== 'tyres') { const e = OSC('sawtooth', kind === 'engine' ? 38 : 33, BQ('lowpass', 170, 1.2, G(0.7, lvl))); lfo(0.5 + i * 0.01, 2, e.frequency); }
+      if (kind === 'plough') { const sc = G(0.25, lvl); src(nw, 1.21, BQ('bandpass', 1300, 1.5, sc)); lfo(0.9, 0.12, sc.gain); }
+    } else if (kind === 'siren') {
+      // the ambulance's two tones
+      o.sg = G(0, lvl); o.so = OSC('square', 650, BQ('bandpass', 1100, 1.2, o.sg));
+    } else if (kind === 'tram') {
+      // the rumble of the bogies, the whine of the motors with the speed, the wheels over the joints
+      o.rg = G(0, lvl); src(nb, 1.05, BQ('lowpass', 260, 0.8, o.rg)); o.wg = G(0, lvl); o.wo = OSC('sawtooth', 200, BQ('bandpass', 700, 4, o.wg));
+    } else if (kind === 'fire') {
+      // the fire in the barrel: a soft roar, the wood cracking
+      src(nb, 1.4, BQ('lowpass', 380, 0.7, G(0.6, lvl)));
+    } else if (kind === 'rinkmusic') {
+      // a horn loudspeaker on a pole: a narrow, rattling band
+      o.f = BQ('bandpass', 1300, 1.1, lvl); o.band = N(WaveShaperNode, { curve: new Float32Array([...Array(64).keys()].map((k) => Math.tanh((k / 31.5 - 1) * 2.5))) }, o.f);
+    } else if (kind === 'fridge') {
+      o.hg = G(0, lvl); for (const [f, v] of [[50, 0.5], [100, 0.3], [150, 0.08]]) OSC('sine', f, G(v, o.hg)); OSC('sawtooth', 100, BQ('bandpass', 2300, 6, G(0.02, o.hg)));
+    } else if (kind === 'neigh' || kind === 'liftin') {
+      // through the wall: only what is low gets in
+      o.f = BQ('lowpass', 380, 0.8, lvl); o.vg = G(0, o.f); o.vo = OSC('sawtooth', 120, (o.f1 = BQ('bandpass', 500, 5, o.vg)), (o.f2 = BQ('bandpass', 1100, 6, o.vg)));
+      o.dg = G(0, o.f); OSC('sawtooth', 115, BQ('bandpass', 240, 3, o.dg)); o.mg = G(0, o.f); OSC('sawtooth', 48, BQ('lowpass', 140, 1, o.mg));
+    } else if (kind === 'kettle') {
+      // the water heating up, then the whistle
+      o.hg = G(0, lvl); src(nw, 0.62, BQ('bandpass', 900, 0.9, o.hg)); o.wg = G(0, lvl); o.wo = OSC('sine', 2250, o.wg); lfo(6.5, 22, o.wo.frequency);
     } else if (kind === 'drunk') {
       // a man's voice through two formants, slurring from note to note
       o.vg = G(0, lvl); o.vo = OSC('sawtooth', 110, (o.f1 = BQ('bandpass', 600, 5, o.vg)), (o.f2 = BQ('bandpass', 1100, 7, o.vg)));
@@ -127,9 +162,9 @@ function mkSound(ac) {
     const side = (dx, dz) => clamp((dx * rx + dz * rz) / (hypot(dx, dz) + 1e-3), -1, 1);
     glass.frequency.setTargetAtTime(mix(16000, 420, inr), t, 0.12); room.frequency.setTargetAtTime(mix(500, 16000, inr), t, 0.12); pane.gain.setTargetAtTime(mix(1, 0.6, inr), t, 0.12);
     wind.gain.setTargetAtTime(0.1 + 0.8 * gu * gu, t, 0.4); windF.frequency.setTargetAtTime(240 + 760 * gu, t, 0.5);
-    whis.gain.setTargetAtTime(0.5 * sstep(0.5, 0.95, gu), t, 0.3); whisF.frequency.setTargetAtTime(880 + 520 * gu, t, 0.5);
+    whis.gain.setTargetAtTime(0.5 * sstep(0.5, 0.95, gu), t, 0.3); howl.gain.setTargetAtTime(1.4 * F[BLZ], t, 0.8); whisF.frequency.setTargetAtTime(880 + 520 * gu, t, 0.5);
     cars.forEach((c, k) => {
-      const o = RC + k * 4, dz = ROADZ - 1.8 * F[o + 1] - cz, dx = F[o] - cx, d = hypot(dx, dz), on = F[o + 2], big = F[o + 3] > 4 ? 1 : 0, heavy = F[o + 3] === 5 || F[o + 3] === 6 || F[o + 3] === 8 || F[o + 3] > 9;
+      const o = RC + k * 4, dz = ROADZ + 1.8 * F[o + 1] - cz, dx = F[o] - cx, d = hypot(dx, dz), on = F[o + 2], big = F[o + 3] > 4 ? 1 : 0, heavy = F[o + 3] === 5 || F[o + 3] === 6 || F[o + 3] === 8 || F[o + 3] > 9;
       c.g.gain.setTargetAtTime(on * (big ? 34 : 22) / (40 + d), t, 0.3); c.f.frequency.setTargetAtTime((big ? 220 : 350) + 9e4 / (d + 60), t, 0.3); c.p.pan.setTargetAtTime(side(dx, dz), t, 0.2);
       c.eg.gain.setTargetAtTime(on * (heavy ? 30 : 0) / (30 + d), t, 0.3); c.eo.frequency.setTargetAtTime(heavy ? 46 + 6 * sin(now * 0.3 + k) : 50, t, 0.5);
     });
@@ -169,7 +204,12 @@ function mkSound(ac) {
     const ahead = t + 0.25;
     for (const o of S) {
       if (o.w) { const p = walkAt(o.w, F[TIME]); o.x = p[0]; o.z = p[1]; }
-      const dx = o.x - cx, dy = o.y - cy, dz = o.z - cz, d = hypot(dx, dy, dz), lv = 1 / (1 + (d / o.R) ** 2), near = d < o.far;
+      let gate = o.tv >= 0 ? FLAT.tv[o.tv] : 1;
+      if (o.a) {
+        const k = o.a * 8, nx = ACT[k], nz = ACT[k + 2]; gate = ACT[k + 1] > -50 && ACT[k + 7] > 0.5 ? 1 : 0;
+        o.v = mix(o.v, min(hypot(nx - o.px, nz - o.pz) / 0.1, 30), 0.3); o.px = nx; o.pz = nz; o.x = nx; o.y = ACT[k + 1] + 1; o.z = nz;
+      }
+      const dx = o.x - cx, dy = o.y - cy, dz = o.z - cz, d = hypot(dx, dy, dz), lv = gate / (1 + (d / o.R) ** 2), near = d < o.far && gate > 0;
       o.lvl.gain.setTargetAtTime(near ? lv : 0, t, 0.3); o.p.pan.setTargetAtTime(side(dx, dz) * min(1, d / 3), t, 0.2);
       if (!near) { o.next = 0; continue; }
       if (o.next < t) o.next = t;
@@ -227,7 +267,60 @@ function mkSound(ac) {
           const a = t + 0.05, n = rr(6, 14); o.mg.gain.setTargetAtTime(0.16, a, 0.6); o.mg.gain.setTargetAtTime(0.05, a + n, 0.6); o.wh.gain.setTargetAtTime(0.02, a, 0.8); o.wh.gain.setTargetAtTime(0, a + n, 0.5);
           burst(200, 1, a, 0.6, 0.12, o.lvl, 'lowpass'); burst(220, 1, a + n, 0.6, 0.12, o.lvl, 'lowpass');
         }
-      } else if (o.kind === 'drip') {
+      } else if (o.kind === 'tyres' || o.kind === 'engine' || o.kind === 'plough') {
+        o.f.frequency.setTargetAtTime(300 + 40 * o.v + 6e3 / (d + 15), t, 0.3);
+      } else if (o.kind === 'siren') {
+        for (; o.next < ahead; o.next += 0.62) { o.step ^= 1; o.so.frequency.setValueAtTime(o.step ? 950 : 650, o.next); o.sg.gain.setTargetAtTime(0.4, o.next, 0.01); }
+      } else if (o.kind === 'tram') {
+        o.rg.gain.setTargetAtTime(0.15 + 0.09 * o.v, t, 0.3); o.wg.gain.setTargetAtTime(0.012 * o.v, t, 0.3); o.wo.frequency.setTargetAtTime(160 + 70 * o.v, t, 0.3);
+        if (o.v > 1) for (; o.next < ahead; o.next += 12.5 / max(o.v, 1)) for (const dt of [0, 0.09]) burst(rr(300, 500), 1.3, o.next + dt, 0.5, 0.05, o.lvl);
+        else o.next = t;
+        // the bell as it moves off
+        if (o.v > 0.4 && !o.on) { for (const dt of [0, 0.35]) { tone('sine', 1560, t + dt, 0.002, 0.3, 0.9, o.lvl); tone('sine', 3900, t + dt, 0.002, 0.08, 0.4, o.lvl); } }
+        o.on = o.v > 0.4 ? 1 : o.v < 0.1 ? 0 : o.on;
+      } else if (o.kind === 'steps') {
+        // footsteps in the snow, two to a stride
+        const k = o.a * 8, r = ACT[k + 4] / PI;
+        if (r > 0.1) for (; o.next < ahead; o.next += 1 / r) { burst(rr(1800, 3000), 1.2, o.next, 0.3, 0.07, o.lvl); burst(rr(300, 500), 1, o.next, 0.25, 0.06, o.lvl, 'lowpass'); }
+        else o.next = t;
+      } else if (o.kind === 'fire') {
+        for (; o.next < ahead; o.next += rr(0.04, 0.4)) burst(rr(1500, 5000), 1.5, o.next, rr(0.08, 0.5), rr(0.005, 0.02), o.lvl);
+      } else if (o.kind === 'rinkmusic') {
+        // an old waltz off a record, round and round
+        const st = 60 / 150;
+        for (; o.next < ahead; o.next += st, o.step++) {
+          const b = o.step % 3, bar = (o.step / 3 | 0) % 16, r = 52 + [0, 0, 5, 5, 7, 7, 0, 0, 2, 2, 7, 7, 5, 4, 2, 0][bar], m = [12, 16, 19, 16, 14, 12, 11, 12][(o.step / 3 | 0) % 8];
+          tone(b ? 'triangle' : 'sawtooth', note(b ? r + 4 + (b === 2 ? 3 : 0) : r - 12), o.next, 0.006, b ? 0.08 : 0.16, st * 0.7, o.band);
+          if (b === 0 || rnd() < 0.4) tone('square', note(r + m), o.next, 0.02, 0.07, st * (b ? 0.9 : 2.4), o.band);
+        }
+      } else if (o.kind === 'kids') {
+        // children shouting and laughing now and then
+        if (rnd() < 0.05) for (let k = 0, a = t + 0.05; k < 2 + (rnd() * 4 | 0); k++, a += rr(0.12, 0.3)) { const f = rr(520, 900); tone('sawtooth', f, a, 0.02, rr(0.1, 0.25), rr(0.1, 0.3), BQ('bandpass', 1600, 2.5, o.lvl), f * rr(0.7, 1.3)); }
+      } else if (o.kind === 'fridge') {
+        // the compressor: on for a while, then off, with a shudder each time
+        const on = fract(F[TIME] / 75 + o.seed) < 0.6; o.hg.gain.setTargetAtTime(on ? 0.22 : 0, t, on ? 0.6 : 0.2);
+        if (on !== !!o.on) { burst(160, 1, t + 0.05, 0.5, 0.25, o.lvl, 'lowpass'); o.on = on ? 1 : 0; }
+      } else if (o.kind === 'neigh') {
+        // the neighbours: somebody upstairs walking about, a quarrel, a drill, a television through the wall
+        if (t > o.step) {
+          const e = rnd(); o.step = t + rr(14, 40); o.ev = e < 0.3 ? 1 : e < 0.55 ? 2 : e < 0.75 ? 3 : 4; o.end = t + rr(4, 12);
+        }
+        if (o.ev && t < o.end) for (; o.next < ahead;) {
+          const a = o.next;
+          if (o.ev === 1) { burst(rr(70, 110), 1, a, 0.9, 0.12, o.f, 'lowpass'); o.next = a + rr(0.45, 0.7); }
+          else if (o.ev === 2 || o.ev === 4) { const dur = rr(0.1, 0.25); o.vo.frequency.setTargetAtTime((o.ev === 2 ? rr(160, 260) : rr(100, 150)), a, 0.03); o.f1.frequency.setTargetAtTime(rr(300, 800), a, 0.02); o.vg.gain.setTargetAtTime(o.ev === 2 ? rr(0.4, 0.9) : 0.3, a, 0.02); o.vg.gain.setTargetAtTime(0.03, a + dur * 0.8, 0.02); o.next = a + dur + (rnd() < 0.1 ? rr(0.3, 1) : 0); }
+          else { o.dg.gain.setTargetAtTime(0.6, a, 0.05); o.dg.gain.setTargetAtTime(0, a + rr(1.5, 3), 0.05); o.next = a + rr(3, 4.5); }
+        }
+        else { o.vg.gain.setTargetAtTime(0, t, 0.1); o.dg.gain.setTargetAtTime(0, t, 0.1); o.ev = 0; o.next = t; }
+      } else if (o.kind === 'liftin') {
+        // the lift behind the front door: the motor runs, the doors bang; somebody going up the stairs
+        if (rnd() < 0.005) { const a = t + 0.05, n = rr(6, 12); o.mg.gain.setTargetAtTime(0.5, a, 0.5); o.mg.gain.setTargetAtTime(0, a + n, 0.5); burst(180, 1, a, 0.9, 0.15, o.f, 'lowpass'); burst(200, 1, a + n + 0.4, 0.9, 0.15, o.f, 'lowpass'); }
+        if (rnd() < 0.004) for (let k = 0; k < 10; k++) burst(rr(90, 140), 1, t + 0.1 + k * 0.5, 0.6 * sin((k + 1) / 11 * PI), 0.08, o.f, 'lowpass');
+      } else if (o.kind === 'kettle') {
+        const boil = FLAT.kettle === 2 ? F[TIME] - FLAT.boil : -1;
+        o.hg.gain.setTargetAtTime(FLAT.kettle ? 0.04 + 0.3 * F[KET] * F[KET] : 0, t, 0.5);
+        o.wg.gain.setTargetAtTime(boil > 21 ? 0.12 * sstep(21, 24, boil) : 0, t, 0.15);
+      } else if (o.kind === 'drip' || o.kind === 'tap') {
         for (; o.next < ahead;) { const a = o.next, f = rr(1600, 3200); tone('sine', f, a, 0.001, rr(0.1, 0.3), 0.06, o.lvl, f * 0.8); o.next = a + rr(0.4, 2.8); }
       } else if (o.kind === 'crow') {
         if (o.step < t && rnd() < 0.03) {
@@ -334,7 +427,7 @@ function mkSound(ac) {
     }
     // dogs: now and then one howls or barks, and another may answer
     if (t > dogT) {
-      const dogs = S.filter((o) => o.kind === 'dog');
+      const dogs = S.filter((o) => (o.kind === 'dog' || o.kind === 'bark') && hypot(o.x - cx, o.z - cz) < o.far);
       if (dogs.length) {
         const fire = (o, a) => {
           if (rnd() < 0.55) {
@@ -345,12 +438,20 @@ function mkSound(ac) {
             g.gain.setValueAtTime(0, a); g.gain.linearRampToValueAtTime(0.5, a + 0.4); g.gain.setValueAtTime(0.5, a + dur * 0.75); g.gain.linearRampToValueAtTime(0, a + dur); o1.stop(a + dur + 0.1);
           } else for (let k = 0, b = a; k < 2 + (rnd() * 4 | 0); k++, b += rr(0.25, 0.5)) { tone('sawtooth', rr(320, 420), b, 0.005, 0.5, 0.12, BQ('bandpass', 800, 1.5, o.lvl), 200); burst(900, 1, b, 0.4, 0.1, o.lvl); }
         };
+        // one starts, and others answer it, the nearer ones first
         const o = pick(dogs); fire(o, t + 0.1);
-        if (rnd() < 0.45) fire(pick(dogs), t + rr(1.5, 3.5));
+        let a = t + rr(1.2, 3); for (const q of dogs.filter((q) => q !== o).sort((p, q) => hypot(p.x - o.x, p.z - o.z) - hypot(q.x - o.x, q.z - o.z)).slice(0, 3)) { if (rnd() < 0.55) { fire(q, a); a += rr(1, 3); } }
       }
       dogT = t + rr(12, 40);
     }
   };
+}
+// the click of a switch in the flat
+function click() {
+  if (!AC || muted) return;
+  const t = AC.currentTime, b = new AudioBuffer({ length: 1200, numberOfChannels: 1, sampleRate: AC.sampleRate }), d = b.getChannelData(0);
+  for (let i = 0; i < 1200; i++) d[i] = (rnd() * 2 - 1) * exp(-i / 90) * 0.6;
+  const s = new AudioBufferSourceNode(AC, { buffer: b }), f = new BiquadFilterNode(AC, { type: 'bandpass', frequency: 2600, Q: 1.2 }); s.connect(f); f.connect(OUT); s.start(t);
 }
 // called on every click / key / touch: builds the graph once and resumes it when the browser allows
 function sound() {

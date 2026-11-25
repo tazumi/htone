@@ -1,9 +1,9 @@
 // ============================================================================
 // development tools: only in dev.html (npm run build:dev), never in index.html
 // ============================================================================
-//   F    fly the camera along the scripted path (FLY in main.js), one minute through the whole yard
+//   G    fly the camera along the scripted path (FLY in main.js), one minute through the whole yard
 //   B    the same flight as a benchmark: the resolution stays fixed, every frame is timed, the result is shown at the end
-//   F, B or 1-6 during a flight stop it
+//   G, B or 1-6 during a flight stop it
 // Test hooks in the address: dev.html#p=3&t=45 opens viewpoint 3 at scene time 45 s without the menu;
 // cam=x,y,z,tx,ty,tz aims freely, hold=1 fixes the resolution, bench=1 starts the benchmark; window.dev exposes the state.
 {
@@ -18,7 +18,13 @@
   };
   // frame() moves the free camera and then calls render(): step in between and put the camera on the path instead
   const draw = render;
+  let follow = null;
   render = () => {
+    if (follow) {
+      // follow=slot,x,y,z: the camera rides with an actor (life.js) at that offset in its frame, looking at it
+      const [s, ox, oy, oz] = follow, k = s * 8, a = ACT[k + 3], [dx, dz] = rotY(ox, oz, a);
+      lookAt(ACT[k] + dx, ACT[k + 1] + oy, ACT[k + 2] + dz, ACT[k], ACT[k + 1] + 1, ACT[k + 2]);
+    }
     if (flying) {
       const dtr = F[LAST] - last; last = F[LAST];
       F[FLT] += min(dtr / 1000, 0.1); flyAt();
@@ -34,7 +40,7 @@
   };
   addEventListener('keydown', (e) => {
     if (menu || e.repeat) return;
-    if (e.code === 'KeyF' || e.code === 'KeyB') { if (flying) stop(); else start(e.code === 'KeyB'); } else if (/Digit[1-6]/.test(e.code)) stop();
+    if (e.code === 'KeyG' || e.code === 'KeyB') { if (flying) stop(); else start(e.code === 'KeyB'); } else if (/Digit[1-6]/.test(e.code)) stop();
   });
   const h = Object.fromEntries(location.hash.slice(1).split('&').filter(Boolean).map((s) => s.split('=')));
   if (location.hash) {
@@ -42,6 +48,7 @@
     if (h.t) F[TIME] = +h.t;
     if (h.p) lookAt(...POSES[h.p - 1]);
     if (h.cam) lookAt(...h.cam.split(',').map(Number));
+    if (h.follow) follow = h.follow.split(',').map(Number);
     if (h.hold) dynT = -Infinity;
     if (h.bench) start(true);
   }
@@ -56,5 +63,7 @@
     F[INR] += ((inB(ROOM, F[CX], F[CY], F[CZ], -0.3) ? 1 : 0) - F[INR]) * (1 - exp(-dt * 6));
     render(); await Q.onSubmittedWorkDone();
   };
-  window.dev = { F, lookAt, POSES, halt, step, sound, audio: () => ({ AC, OUT }), state: () => ({ W, H, pix, det, gpu: F[GPU], result, flying, tris: nI / 3, wins: nWin, grass: Wd.grass.n }) };
+  // the flight over the town: where it passes closer than 6 m to a house's box (or under its roof)
+  const tourCheck = () => { const out = [], T = tourLen / TOURV; for (let t = 0; t < T; t += 0.5) { tourAt(t); for (let i = 0; i < NBX; i++) { const o = i * 5, dx = max(BX[o] - F[CX], 0, F[CX] - BX[o + 2]), dz = max(BX[o + 1] - F[CZ], 0, F[CZ] - BX[o + 3]), dy = max(F[CY] - BX[o + 4], 0); if (hypot(dx, dz, dy) < 6) out.push([t.toFixed(1), F[CX].toFixed(0), F[CY].toFixed(0), F[CZ].toFixed(0), i, BX[o + 4].toFixed(0)].join(' ')); } } return { T, out }; };
+  window.dev = { F, ACT, lookAt, tourCheck, POSES, halt, step, sound, audio: () => ({ AC, OUT }), state: () => ({ dec: nDec, W, H, pix, det, gpu: F[GPU], result, flying, tris: nI / 3, wins: nWin, grass: Wd.grass.n }) };
 }

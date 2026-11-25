@@ -49,7 +49,7 @@ const tLamp = tex(LGN * 2, LGN, 'rgba8uint', TU.TEXTURE_BINDING | TU.COPY_DST);
 const tAtlas = tex(ATLAS, ATLASH, 'rgba8unorm', TU.TEXTURE_BINDING | TU.COPY_DST | TU.RENDER_ATTACHMENT, { mips: 12 });
 
 // the uniform block G (see shaders.js): offsets in floats
-const U_CAM = 16, U_RIGHT = 20, U_UP = 24, U_FWD = 28, U_RES = 32, U_MIS = 36, U_WIND = 40, U_PAP = 44, U_TR = 48, U_TR2 = 52, U_PL = 56, U_EV = 60, U_HN = 64, U_HZ = 68, U_RC = U_HZ + 48, U_LAMP = U_RC + NRC * 4, NL = LAMPS.length;
+const U_CAM = 16, U_RIGHT = 20, U_UP = 24, U_FWD = 28, U_RES = 32, U_MIS = 36, U_WIND = 40, U_PAP = 44, U_TR = 48, U_TR2 = 52, U_PL = 56, U_EV = 60, U_HN = 64, U_HZ = 68, U_RC = U_HZ + 48, U_EX = U_RC + NRC * 4, U_ACT = U_EX + 8, U_LAMP = U_ACT + NACT * 8, NL = LAMPS.length;
 const UB = new Float32Array(U_LAMP + NL * 8);
 const ubo = device.createBuffer({ size: UB.byteLength, usage: BU.UNIFORM | BU.COPY_DST });
 LAMPS.forEach((l, i) => UB.set([l.x, l.y, l.z, l.r, l.c[0], l.c[1], l.c[2], l.t], U_LAMP + i * 8));
@@ -165,7 +165,7 @@ const FLYN = FLY.length / 6, FLYT = 60, LUTN = 1024, flyLUT = new Float32Array(L
 // per-frame float state lives in one preallocated array, so the frame loop allocates no heap numbers
 const F = new Float64Array(128), P6 = new Float64Array(6);
 const CX = 0, CY = 1, CZ = 2, YAW = 3, PIT = 4, FX = 5, FY = 6, FZ = 7, RX = 8, RZ = 9, UX = 10, UY = 11, UZ = 12, VX = 13, VY = 14, VZ = 15, TIME = 16, FLT = 17, LAST = 18, GPU = 19, HUDT = 20, SPL = 21, MX = 22, MY = 23, MZ = 24,
-  GUST = 25, WX = 26, WZ = 27, PAP = 28, TRX = 29, TRD = 30, TRON = 31, FLK = 32, INR = 33, FRX = 34, FRD = 35, FRON = 36, PLX = 37, PLZ = 38, PLH = 39, PLON = 40, DRF = 41, SNOWD = 42, EVA = 43, EVX = 44, EVS = 45, EVL = 46,
+  BLZ = 82, KET = 83, BAL = 84, TOUR = 85, TOURT = 86, GUST = 25, WX = 26, WZ = 27, PAP = 28, TRX = 29, TRD = 30, TRON = 31, FLK = 32, INR = 33, FRX = 34, FRD = 35, FRON = 36, PLX = 37, PLZ = 38, PLH = 39, PLON = 40, DRF = 41, SNOWD = 42, EVA = 43, EVX = 44, EVS = 45, EVL = 46,
   RC = 48; // RC: NRC x (x, direction, present, kind)
 // aim the camera from P6 = position + look-at point
 function aim() {
@@ -388,11 +388,17 @@ function render() {
   m[U_TR2] = F[FRX]; m[U_TR2 + 1] = F[FRD]; m[U_TR2 + 2] = F[FRON];
   m[U_PL] = F[PLX]; m[U_PL + 1] = F[PLZ]; m[U_PL + 2] = F[PLH]; m[U_PL + 3] = F[PLON];
   for (let k = 0; k < NRC * 4; k++) m[U_RC + k] = F[RC + k];
+  m.set(ACT, U_ACT);
   hazeList();
   { const o = U_LAMP + FLICK * 8 + 4, c = LAMPS[FLICK].c, f = F[FLK]; m[o] = c[0] * f; m[o + 1] = c[1] * f; m[o + 2] = c[2] * f; }
   { const o = U_LAMP + FLICK2 * 8 + 4, c = LAMPS[FLICK2].c, f = fract(sin(floor(F[TIME] * 9) * 47.3) * 9631.7) > 0.8 || fract(F[TIME] / 17) > 0.9 ? 0.08 : 1; m[o] = c[0] * f; m[o + 1] = c[1] * f; m[o + 2] = c[2] * f; }
-  { const o = U_LAMP + TVL * 8 + 4, c = LAMPS[TVL].c, f = 0.55 + 0.45 * fract(sin(floor(F[TIME] * 3) * 127.1) * 43758.5453); m[o] = c[0] * f; m[o + 1] = c[1] * f; m[o + 2] = c[2] * f; }
-  { const o = U_LAMP + TVL2 * 8 + 4, c = LAMPS[TVL2].c, f = 0.5 + 0.5 * fract(sin(floor(F[TIME] * 2.3 + 0.5) * 91.7) * 43758.5453); m[o] = c[0] * f; m[o + 1] = c[1] * f; m[o + 2] = c[2] * f; }
+  // the flat's lights as its switches have them, the televisions flickering with their pictures (when on)
+  ALAMP.forEach((l, j) => { if (j === 1) return; const o = U_LAMP + (AL0 + j) * 8 + 4, f = FLAT.light[j]; m[o] = l[5][0] * f; m[o + 1] = l[5][1] * f; m[o + 2] = l[5][2] * f; });
+  m[U_EX] = F[KET]; m[U_EX + 1] = F[BLZ]; m[U_EX + 2] = FLAT.tv[1]; m[U_EX + 3] = FLAT.tv[0]; m[U_EX + 4] = FLAT.kettle > 0 ? 1 : 0;
+  { const o = U_LAMP + TVL * 8 + 4, c = LAMPS[TVL].c, f = FLAT.tv[0] * (0.55 + 0.45 * fract(sin(floor(F[TIME] * 3) * 127.1) * 43758.5453)); m[o] = c[0] * f; m[o + 1] = c[1] * f; m[o + 2] = c[2] * f; }
+  { const o = U_LAMP + TVL2 * 8 + 4, c = LAMPS[TVL2].c, f = FLAT.tv[1] * (0.5 + 0.5 * fract(sin(floor(F[TIME] * 2.3 + 0.5) * 91.7) * 43758.5453)); m[o] = c[0] * f; m[o + 1] = c[1] * f; m[o + 2] = c[2] * f; }
+  // the watchman's fire breathes and flickers
+  { const o = U_LAMP + FIREL * 8 + 4, c = LAMPS[FIREL].c, t = F[TIME], f = 0.72 + 0.18 * sin(t * 2.3) * sin(t * 3.7) + 0.16 * fract(sin(floor(t * 14) * 78.2) * 43758.5); m[o] = c[0] * f; m[o + 1] = c[1] * f; m[o + 2] = c[2] * f; }
   // the club's light over its door goes round the colours on the beat
   { const o = U_LAMP + CLUBL * 8 + 4, t = F[TIME], b = 0.35 + 0.65 * (fract(t * 2.13) < 0.5 ? 1 : 0); for (let j = 0; j < 3; j++) m[o + j] = 9 * b * (0.5 + 0.5 * cos(TAU * (t * 0.23 + j / 3))); }
   Q.writeBuffer(ubo, 0, UB);
@@ -441,18 +447,20 @@ function render() {
 // ---------------------------------------------------------------- what moves on its own: wind, the bad lamp, the highway, the trains, the plane
 // All of it is a function of the scene time, so the picture and the sound (audio.js reads the same numbers) agree.
 // The trains take turns on the track: a passenger train, then a freight train, each every TRAINP seconds.
-const SALP = 290, SALT = 24, TRAINP = 210, TRAIN0 = 38, TRAINV = 22, FREIGHTV = 13, PLANEP = 170, PLANET = 75;
+const BLZP = 470, SALP = 290, SALT = 24, TRAINP = 210, TRAIN0 = 38, TRAINV = 22, FREIGHTV = 13, PLANEP = 170, PLANET = 75;
 function world(dt) {
   const t = F[TIME];
   // wind, 0..1: it dies down to almost nothing and rises again to a strong blow in a slow even swell (a little over a
   // minute each way), with a light flutter on top when it is strong; the offset it has carried the air drives the snow
   const sw = 0.5 - 0.5 * cos(t * TAU / 150 + 0.4 * sin(t * 0.013)); let g = 0.04 + 0.96 * sw * (0.9 + 0.1 * sin(t * 0.83 + 2 * sin(t * 0.31)));
-  F[GUST] = g; const ws = 0.8 + 4.2 * g; F[WX] += WDX * ws * dt; F[WZ] += WDZ * ws * dt;
+  // now and then a blizzard: for a minute and a half the wind blows a gale, the snow comes thick and the haze closes in
+  { const c = ((t + 180) % BLZP + BLZP) % BLZP; F[BLZ] = sstep(0, 18, c) * (1 - sstep(68, 96, c)); g = max(g, F[BLZ] * (0.86 + 0.14 * sin(t * 1.7) * sin(t * 0.61))); }
+  F[GUST] = g; const ws = 0.8 + 4.2 * g + 7 * F[BLZ]; F[WX] += WDX * ws * dt; F[WZ] += WDZ * ws * dt;
   F[PAP] += (g > 0.4 ? g - 0.4 : 0) * 6 * dt;
   // loose snow runs along the ground in the stronger gusts
   F[DRF] += (g > 0.3 ? g - 0.3 : 0) * 9 * dt;
   // the snowfall: from a few flakes to a thick fall and back, on a slower swell of its own (the share of flakes shown)
-  { const s = 0.5 - 0.5 * cos(t * TAU / 230 + 2.1); F[SNOWD] = 0.04 + 0.96 * s * s; }
+  { const s = 0.5 - 0.5 * cos(t * TAU / 230 + 2.1); F[SNOWD] = max(0.04 + 0.96 * s * s, F[BLZ]); }
   // events: the ambulance's lights at a far door (on for a while, off for a while), the level crossing while a train
   // is near it, a salute far away (seconds since it began, -1 when none), a car alarm in the yard
   F[EVA] = fract(t / 260 + 0.3) < 0.45 ? 1 : 0;
@@ -479,15 +487,23 @@ function world(dt) {
   // an aeroplane far overhead now and then, on a new heading every time
   const pc = floor((t + 60) / PLANEP), ps = t + 60 - pc * PLANEP, ph = ihash(pc, 7, 11) * TAU, pd = (ps / PLANET - 0.5) * 16000, po = (ihash(pc, 5, 2) - 0.5) * 5000;
   F[PLH] = ph; F[PLON] = ps < PLANET ? 1 : 0; F[PLX] = cos(ph) * pd - sin(ph) * po; F[PLZ] = sin(ph) * pd + cos(ph) * po;
+  // the traffic of the town, the people going from door to door, the dogs (life.js)
+  lifeTick(t);
+  flatTick(t, dt);
 }
 
 // ---------------------------------------------------------------- collision
 // Boxes for the houses, the cars and the posts; the viewer's room and the window opening are a hole in the first one.
 const CR = 0.3;
 const inB = (b, x, y, z, m) => x > b[0] + m && x < b[3] - m && y > b[1] + m && y < b[4] - m && z > b[2] + m && z < b[5] - m;
-const free = (x, y, z) => inB(TUN, x, y, z, 0.1) || AFREE.some((b, i) => inB(b, x, y, z, i < APT.length ? 0.22 : 0.1));
+// the doorway of a shut door is not free; AT_DOOR[i]: the door of AFREE box i
+const AT_DOOR = AFREE.map((b, i) => FLAT.doors.find((d) => (d.ad < 0 ? APT.length + ADOOR.length : APT.length + d.ad) === i));
+const shut = (i) => AT_DOOR[i] && ACT[AT_DOOR[i].o * 8 + 6] < 0.65;
+const free = (x, y, z) => inB(TUN, x, y, z, 0.1) || AFREE.some((b, i) => !shut(i) && inB(b, x, y, z, i < APT.length ? 0.22 : 0.1));
 // inside the walls of the viewer's house
-const home = (x, y, z) => x > BX[0] - CR && x < BX[2] + CR && z > BX[1] - CR && z < BX[3] + CR && y < BX[4] + CR && !free(x, y, z);
+// (the balcony is part of it: its parapet and the slab over it keep one in)
+const BALC = AFREE[AFREE.length - 1], BALE = [BALC[0] - 0.45, BALC[1] - 0.45, BALC[2] - 0.45, BALC[3] + 0.45, RY + 2.75, BALC[5] + 0.45];
+const home = (x, y, z) => ((x > BX[0] - CR && x < BX[2] + CR && z > BX[1] - CR && z < BX[3] + CR && y < BX[4] + CR) || inB(BALE, x, y, z, 0)) && !free(x, y, z);
 function collide() {
   let x = F[CX] + F[MX], y = F[CY] + F[MY], z = F[CZ] + F[MZ];
   x = x < -WE ? -WE : x > WE ? WE : x; z = z < -WE ? -WE : z > WE ? WE : z; y = y < 0.4 ? 0.4 : y > 95 ? 95 : y;
@@ -506,6 +522,81 @@ function collide() {
   }
   F[CX] = x; F[CY] = y; F[CZ] = z;
 }
+
+// ---------------------------------------------------------------- the flat: the switches, the doors, the televisions, the kettle
+// F, a click or a tap uses what the view points at within reach (USE, world.js); the line at the bottom says what it is.
+const hintEl = $('u');
+let useK = -1, hintK = -2;
+function aimUse() {
+  if (!inB(APTB, F[CX], F[CY], F[CZ], -1.2) && F[BAL] < 0.5) return -1;
+  let best = -1, bd = 3;
+  for (let k = 0; k < USE.length; k++) {
+    const u = USE[k], dx = u.p[0] - F[CX], dy = u.p[1] - F[CY], dz = u.p[2] - F[CZ], t = dx * F[FX] + dy * F[FY] + dz * F[FZ];
+    if (t <= 0 || t > bd) continue;
+    if (dx * dx + dy * dy + dz * dz - t * t < u.r * u.r) { best = k; bd = t; }
+  }
+  return best;
+}
+function use() {
+  if (useK < 0) return;
+  const u = USE[useK], t = F[TIME];
+  if (u.kind === 'light') FLAT.light.forEach((v, j) => { if (j !== 1 && ALAMP[j][0] === u.i) FLAT.light[j] = v ? 0 : 1; });
+  else if (u.kind === 'tv') FLAT.tv[u.i] ^= 1;
+  else if (u.kind === 'kettle') { if (FLAT.kettle === 2) FLAT.kettle = 0; else { FLAT.kettle = 2; FLAT.boil = t; } }
+  else if (u.kind === 'door') {
+    // a door can't be shut on the one standing in it
+    const d = FLAT.doors[u.i], j = d.ad < 0 ? APT.length + ADOOR.length : APT.length + d.ad;
+    if (d.want && inB(AFREE[j], F[CX], F[CY], F[CZ], -0.25)) return;
+    d.want = !d.want;
+  }
+  click();
+  hintK = -2;
+}
+function flatTick(t, dt) {
+  // the doors swing to where they are wanted
+  const k = 1 - exp(-dt * 4);
+  for (const d of FLAT.doors) { const o = d.o * 8 + 6, to = d.want ? d.open || 1.3 : 0; ACT[o] += (to - ACT[o]) * k; }
+  // the kettle: steaming a little on the low gas, more and more once put on to boil, nothing when the gas is off
+  const ket = FLAT.kettle === 2 ? 0.3 + 0.7 * sstep(4, 20, t - FLAT.boil) : FLAT.kettle ? 0.35 : 0;
+  F[KET] += (ket - F[KET]) * (1 - exp(-dt * (ket > F[KET] ? 1.5 : 0.6)));
+}
+// the line under the view: what F (or a tap) would use
+function hint() {
+  useK = menu || F[TOUR] ? -1 : aimUse();
+  if (useK === hintK) return;
+  hintK = useK;
+  hintEl.textContent = useK < 0 ? '' : `${mob ? T.tap : 'F'} · ${T[USE[useK].kind]}`;
+}
+
+// ---------------------------------------------------------------- the flight over the town (T, or the menu's button)
+// A closed loop of camera positions and the points looked at (Catmull-Rom), flown at an even pace; any key or a finger
+// hands the camera back where it is.
+const TOURK = [
+  [18, 32, 70, 0, 6, 0], [-40, 30, 40, -140, 6, 10], [-200, 38, 20, -320, 4, 20], [-300, 22, 70, -420, 3, 40], [-400, 30, 40, -440, 2, -60],
+  [-440, 27, -60, -420, 2, -118], [-380, 24, -150, -250, 3, -230], [-280, 22, -190, -200, 3, -235], [-150, 30, -200, -40, 4, -150],
+  [-20, 40, -150, 120, 6, -130], [140, 46, -110, 300, 4, -10], [250, 28, -70, 330, 4, 10], [300, 24, 30, 320, 2, 80], [250, 26, 110, 140, 6, 190],
+  [140, 24, 180, 122, 7, 260], [150, 30, 260, 220, 10, 400], [210, 40, 300, 330, 15, 420], [120, 44, 330, -60, 3, 400], [-40, 34, 360, -112, 2, 393],
+  [-150, 30, 340, -80, 2, 450], [-180, 34, 430, -60, 4, 330], [-80, 40, 250, 0, 10, 60], [0, 40, 150, 6, 6, 20],
+];
+const TOURN = TOURK.length, TOURV = 9, TOURL = new Float32Array(1025);
+let tourLen = 0;
+function tourRaw(u) {
+  // u along the loop, 0..TOURN
+  const i = floor(u) % TOURN, f = u - floor(u), K = (j) => TOURK[((j % TOURN) + TOURN) % TOURN];
+  const a = K(i - 1), b = K(i), c = K(i + 1), d = K(i + 2);
+  for (let o = 0; o < 6; o++) P6[o] = 0.5 * (2 * b[o] + (c[o] - a[o]) * f + (2 * a[o] - 5 * b[o] + 4 * c[o] - d[o]) * f * f + (3 * b[o] - a[o] - 3 * c[o] + d[o]) * f * f * f);
+}
+{ // arc length table, as for the scripted path
+  const M = 8192, len = new Float32Array(M + 1); let px = 0, py = 0, pz = 0;
+  for (let k = 0; k <= M; k++) { tourRaw(k / M * TOURN); if (k) len[k] = len[k - 1] + hypot(P6[0] - px, P6[1] - py, P6[2] - pz); px = P6[0]; py = P6[1]; pz = P6[2]; }
+  tourLen = len[M];
+  for (let k = 0, j = 0; k <= 1024; k++) { const d = k / 1024 * len[M]; while (j < M - 1 && len[j + 1] < d) j++; TOURL[k] = (j + (d - len[j]) / max(len[j + 1] - len[j], 1e-6)) / M * TOURN; }
+}
+function tourAt(t) {
+  let s = (t * TOURV / tourLen) % 1; s *= 1024; const k = floor(s) | 0;
+  tourRaw(TOURL[k] + (TOURL[k + 1] - TOURL[k]) * (s - k)); aim();
+}
+const tour = (on) => { F[TOUR] = on ? 1 : 0; F[VX] = F[VY] = F[VZ] = 0; hintK = -2; if (on) F[TOURT] = 0; };
 
 function frame(now) {
   requestAnimationFrame(frame);
@@ -531,7 +622,8 @@ function frame(now) {
   }
   F[TIME] += dt;
   world(dt);
-  {
+  if (F[TOUR]) { F[TOURT] += dt; tourAt(F[TOURT]); mdx = mdy = 0; }
+  else {
     // touch: holding the finger away from where it went down keeps turning, like a joystick
     if (tId >= 0) {
       const tr = 4 / (innerWidth < innerHeight ? innerWidth : innerHeight); let jx = (tx - tx0) * tr, jy = (ty - ty0) * tr;
@@ -544,12 +636,14 @@ function frame(now) {
     const dyw = l2x * kq, dpt = l2y * kq; l2x -= dyw; l2y -= dpt;
     const yaw = F[YAW] + dyw; let pitch = F[PIT] - dpt; pitch = pitch < -1.55 ? -1.55 : pitch > 1.55 ? 1.55 : pitch;
     // a walking pace in the room, faster outside, Shift (or a second finger) to hurry
-    const sp = (ks || tN > 1 ? 4 : 1) * (F[INR] > 0.5 ? 1.6 : 5.5), k = 1 - exp(-dt * 4.5), mf = tId >= 0 ? 0.7 : kf - kb, mr = kr - kl, mu = ku - kd, cp = cos(pitch), sy = sin(yaw), cw = cos(yaw);
+    const sp = (ks || tN > 1 ? 4 : 1) * (F[INR] > 0.5 || F[BAL] > 0.5 ? 1.6 : 5.5), k = 1 - exp(-dt * 4.5), mf = tId >= 0 ? 0.7 : kf - kb, mr = kr - kl, mu = ku - kd, cp = cos(pitch), sy = sin(yaw), cw = cos(yaw);
     const vx = F[VX] + ((sy * cp * mf + cw * mr) * sp - F[VX]) * k, vy = F[VY] + ((sin(pitch) * mf + mu) * sp - F[VY]) * k, vz = F[VZ] + ((-cw * cp * mf + sy * mr) * sp - F[VZ]) * k;
     F[YAW] = yaw; F[PIT] = pitch; F[VX] = vx; F[VY] = vy; F[VZ] = vz; F[MX] = vx * dt; F[MY] = vy * dt; F[MZ] = vz * dt;
     collide();
-    F[INR] += ((inB(APTB, F[CX], F[CY], F[CZ], -0.3) ? 1 : 0) - F[INR]) * (1 - exp(-dt * 6));
   }
+  F[INR] += ((inB(APTB, F[CX], F[CY], F[CZ], -0.3) ? 1 : 0) - F[INR]) * (1 - exp(-dt * 6));
+  F[BAL] = inB(AFREE[AFREE.length - 1], F[CX], F[CY], F[CZ], -0.05) ? 1 : 0;
+  hint();
   render();
   if (hud) {
     hN++; if (dtr > hMax) hMax = dtr; if (dtr < hMin) hMin = dtr; if (dtr > hPer * 1.5) { hLate++; hTot++; }
@@ -560,14 +654,18 @@ function frame(now) {
 
 // ---------------------------------------------------------------- input
 const key = (e, v) => {
+  // a key that moves hands the camera back from the flight over the town
+  if (v && F[TOUR] && /^Key[WASDQE]$/.test(e.code)) tour(false);
   switch (e.code) {
     case 'KeyW': kf = v; break; case 'KeyS': kb = v; break; case 'KeyA': kl = v; break; case 'KeyD': kr = v; break;
     case 'KeyE': ku = v; break; case 'KeyQ': kd = v; break; case 'ShiftLeft': case 'ShiftRight': ks = v; break;
     default: if (v && !e.repeat) {
       if (e.code === 'KeyH') { hud = !hud; hTot = 0; hPer = 1e9; info.textContent = ''; }
       else if (e.code === 'KeyM') mute();
+      else if (e.code === 'KeyF') use();
+      else if (e.code === 'KeyT') tour(!F[TOUR]);
       else if (e.code === 'Escape') ui(true);
-      else if (e.code >= 'Digit1' && e.code <= 'Digit6') lookAt(...POSES[e.code.charCodeAt(5) - 49]);
+      else if (e.code >= 'Digit1' && e.code <= 'Digit6') { tour(false); lookAt(...POSES[e.code.charCodeAt(5) - 49]); }
     }
   }
 };
@@ -576,7 +674,7 @@ addEventListener('keydown', (e) => { if (menu && e.code !== 'KeyH' && e.code !==
 addEventListener('keyup', (e) => key(e, 0));
 const release = () => { kf = kb = kl = kr = ku = kd = ks = 0; tId = -1; tN = 0; };
 const capture = () => { sound(); const p = canvas.requestPointerLock({ unadjustedMovement: true }); if (p && p.catch) p.catch(() => canvas.requestPointerLock()).catch(() => 0); };
-canvas.addEventListener('click', capture);
+canvas.addEventListener('click', () => { if (document.pointerLockElement === canvas) use(); else capture(); });
 addEventListener('mousemove', (e) => { if (document.pointerLockElement === canvas) { mdx += e.movementX; mdy += e.movementY; } });
 addEventListener('blur', release);
 const touch = (e) => {
@@ -591,6 +689,10 @@ const touch = (e) => {
   }
 };
 for (const n of ['touchstart', 'touchmove', 'touchend', 'touchcancel']) canvas.addEventListener(n, touch, { passive: false });
+// a short tap that barely moves uses what is in view; a finger on the glass ends the flight over the town
+let tapT = 0, tapX = 0, tapY = 0;
+canvas.addEventListener('touchstart', (e) => { if (F[TOUR]) tour(false); if (e.touches.length === 1) { tapT = performance.now(); tapX = e.touches[0].clientX; tapY = e.touches[0].clientY; } });
+canvas.addEventListener('touchend', (e) => { const c = e.changedTouches[0]; if (performance.now() - tapT < 260 && hypot(c.clientX - tapX, c.clientY - tapY) < 14) use(); });
 
 // ---------------------------------------------------------------- menu
 // The scene keeps rendering (blurred by CSS) behind the menu. Esc, losing the mouse or the corner button open it.
@@ -609,6 +711,7 @@ const go = () => {
   if (!mob) capture();
 };
 bGo.onclick = go; $('o').onclick = () => ui(true);
+$('v').onclick = () => { go(); tour(true); };
 // detail buttons: the current level is lit, the others reload the page with theirs
 $('q').querySelectorAll('button').forEach((b, i) => { if (i === 2 - LV) b.className = 'on'; else b.onclick = () => { keep('htone', 2 - i); location.reload(); }; });
 document.addEventListener('pointerlockchange', () => ui(!document.pointerLockElement));

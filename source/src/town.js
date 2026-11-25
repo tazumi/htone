@@ -22,6 +22,8 @@ for (const [x, z, a, k] of KIOSKS) if (k === 'shaw' || k === 'flowers') { const 
 const walkAt = (w, t) => { const u = fract(t * w[4] / (2 * w[3]) + w[5]), s = w[3] * (u < 0.5 ? u * 2 : 2 - u * 2); return [w[0] + sin(w[2]) * s, w[1] + cos(w[2]) * s]; };
 // where people from the doors go: the bus stop, the shops, the kiosks, the garages, the hockey box, the school, the
 // kindergarten, the private houses, the church
+// the trodden path from each door (DOORS index) to its place: [[x, z], ...] from the step out (life.js walks people along it)
+const DPATH = [];
 const HUBS = [[-2, -127], [-20, -117], [28, -119], [50, -122], [-40, -121], [-57, -121], [106, -40], [-100, 141], [49, 33], [-60, 48], [67, -63], [62, 47], [-140, -58], [-30, 127], [-150, 145], [158, 108], [150, -137]];
 
 function town(o) {
@@ -89,7 +91,7 @@ function town(o) {
     const P = [[x + nx * 1.8, z + nz * 1.8], E];
     for (const t of [0.33, 0.66]) { const s = rr(-1, 1) * j; P.push([E[0] + dx * t + px * s, E[1] + dz * t + pz * s]); }
     P.push([E[0] + dx, E[1] + dz]);
-    PATHS.push(P);
+    PATHS.push(P); DPATH[di] = P;
     // and now and then a shortcut to the next door along the house
     const nd = DOORS[di + 1];
     if (nd && nd[3] === bi && rnd() < 0.5) PATHS.push([E, [(E[0] + nd[0] + sin(nd[2]) * 6) / 2 + rr(-1.5, 1.5), (E[1] + nd[1] + cos(nd[2]) * 6) / 2 + rr(-1.5, 1.5)], [nd[0] + sin(nd[2]) * 6, nd[1] + cos(nd[2]) * 6]]);
