@@ -909,6 +909,8 @@ fn beyond(rd: vec3f, px: f32, cin: vec3f) -> vec3f {
     for (var k = 0; k < 4; k++) { let q = vec2f(ms, h2.y - g2 - 60. * f32(k + 1) + 10.) / max(px * h2.z, .3); col += vec3f(2.6, .12, .06) * (exp(-dot(q, q) * 1.5) * T2 * 1.5 * step(.5, fract(t * .45))); } }
   // the near hills under their forest; a road along their foot with the lights of a few cars on it
   let r1 = ring(rd, 1300.); let a1 = r1.x; let g1 = hill1(a1); let T1 = exp(-r1.z * .00042); let S1 = .25; let wd = wood(a1);
+  // looking down past the edge of the town: the ground comes before the hills
+  if (rd.y < 0. && g.cam.y / (0. - rd.y) < r1.z) { return mix(air, vec3f(.006, .006, .007), S1); }
   if (r1.y < g1 + wd * crowns(a1, 1300., 0.)) {
     col = mix(air, vec3f(.006, .006, .007), S1);
     let s = a1 * 1300.; let v = ss(.86, .93, n1(a1 * 13. + 5.)) * (1. - wd); if (v > 0. && r1.y < g1 + 9.) { let L = lights(s, r1.y, 6., 3.5, .45 * v, px * r1.z, 3.); col += L.rgb * (L.a * 1.5 * T1); }
