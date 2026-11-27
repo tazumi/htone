@@ -391,6 +391,11 @@ fn pal(i: f32) -> vec3f {
     }
     case 7 {
       alb = pal(i.m.x) * (.65 + .5 * wA.b) * (.8 + .3 * wB.b); gl = .3;
+      if (i.m.x > 15.5) {
+        // snow lying in drifts and heaps (palette 16): white all over, a little blue where it turns from the sky,
+        // crusted and grey low down where the street's dirt was thrown on it
+        alb = vec3f(.6, .64, .7) * (.82 + .2 * dB.b + .1 * dC.b) * mix(.72, 1., ss(.0, .35, i.op.y)); gl = .32; bump = .35; cov = 1.; snowK = 1.;
+      }
       if (sd < -9.5) {
         // the rooms of the flat (seed -10 - pattern): wallpaper with stripes, small flowers or a damask, or tiles
         let k = -10. - sd; let q = select(wu, i.op.xz, flt); var pt = 0.;

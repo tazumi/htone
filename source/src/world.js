@@ -860,6 +860,8 @@ CARS.forEach((c, t) => reg('car' + t, meshCar(t)));
   town({ solid, reg, wins, winB, made, decals, glare, steam, snd, boxes, rects, grassY, thaw, bare });
   // --- the town round the estate: its districts, streets, park and forest (districts.js)
   districts({ solid, reg, lod, wins, winB, made, decals, glare, steam, snd, boxes, rects, grassY, thaw, bare, paper });
+  // --- the snow heaped up round the town, the new places, the far corners (extras.js)
+  extras({ solid, reg, lod, wins, winB, made, decals, glare, steam, snd, boxes, rects, grassY, thaw, bare, paper, has: (n) => n in id });
   // --- what moves about on its own: the traffic, people going from door to door, the dogs (life.js)
   life({ solid, reg, glare, steam, snd, boxes, grassY, decals, wins, has: (n) => n in id });
   // --- footprints in the snow along every way somebody walks or something runs: the walkers going to and fro, the
