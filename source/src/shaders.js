@@ -365,7 +365,19 @@ fn pal(i: f32) -> vec3f {
       let ph = hs(floor(pu) * 5.3 + floor(pv) * 11.1 + sd * 9.);
       alb = vec3f(.21, .21, .20) * (.8 + .3 * ph) * (.7 + .5 * wA.b) * (.82 + .36 * wB.b) * mix(.4, 1., seam) * mix(1., .6, ss(.52, .78, wS.a));
       alb = mix(alb, alb * vec3f(.6, .78, .9), step(.86, ph));
-      if (sd >= 2.) {
+      // panel houses of two makes: some warmer, some colder
+      alb *= select(vec3f(1.05, .99, .9), vec3f(.92, .97, 1.05), fract(sd * 5.3) > .5);
+      if (sd >= 1. && sd < 2.) {
+        // a khrushchyovka: smaller pale panels, each seam a thick dark line of sealant, a tint of its own, more stains
+        let tint = select(select(vec3f(1.04, .98, .88), vec3f(.9, .96, 1.05), fract(sd * 3.1) > .5), vec3f(1.05, .93, .9), fract(sd * 7.3) > .7);
+        let sk = min(ss(.0, .06 + fw.x, sx), ss(.0, .06 + fw.y, sy));
+        alb = vec3f(.31, .31, .30) * tint * (.82 + .28 * ph) * (.72 + .42 * wA.b) * mix(.28, 1., mix(.96, sk, lod)) * mix(1., .5, ss(.42, .74, wS.a));
+      }
+      if (sd >= 5.) {
+        // the glass towers: large slabs of cladding with fine joints - graphite, sand-coloured stone or white
+        let C = array<vec3f, 3>(vec3f(.05, .052, .058), vec3f(.36, .3, .22), vec3f(.52, .52, .5));
+        alb = C[u32(floor(sd) - 5.) % 3u] * (.9 + .12 * wA.b) * (.95 + .1 * ph) * mix(.6, 1., seam); gl = .55;
+      } else if (sd >= 2.) {
         // the new towers: smooth panels in bands of colour, a few odd ones out
         let C = array<vec3f, 6>(vec3f(.46, .46, .44), vec3f(.30, .31, .32), vec3f(.36, .13, .07), vec3f(.42, .31, .09), vec3f(.10, .10, .11), vec3f(.09, .22, .24));
         let band = hs(floor(pu * .5) * 3.7 + sd * 11.); let odd = step(.8, ph);
@@ -419,6 +431,8 @@ fn pal(i: f32) -> vec3f {
       } else if (sd < -2.5) { emi = vec3f(14., 6.6, 1.9) * faulty(i.wp); }
       else if (sd < -1.5) { emi = vec3f(.05, .045, .04); }
       else if (sd < -.5) { emi = vec3f(14., 6.6, 1.9); }
+      // the lines of light on the glass towers (a building's tex scale is its bay width): cold white, slowly breathing
+      else if (i.m.z > 1.5) { emi = vec3f(1.6, 1.85, 2.4) * (.85 + .15 * sin(g.cam.w * .5 + i.wp.y * .04)); }
       else { let L = g.lamp[u32(sd + .5)]; emi = L.c.rgb * select(.09, 1.1, L.c.w < 0.); }
     }
     case 9 { alb = mix(vec3f(.16, .165, .17), vec3f(.10, .055, .03), ss(.55, .8, wS.a) * .7) * (.6 + .6 * wA.b); gl = .45; }

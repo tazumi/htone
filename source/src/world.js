@@ -23,6 +23,11 @@ const BT = [
   { bw: 3.4, base: 0.5, front: 'wnwsnwnwnw', back: 'nwnnwnnwnn', side: 'nwwn', mat: M_BRICK, top: 0.3, fh: 3.6, pitch: 1 }, // low brick shed
   { bw: 3.3, base: 0.9, front: 'wwsww', back: 'wwwww', side: 'wwww', mat: M_TINT, top: 0.6, fh: 3.4, pitch: 1 }, // two-storey house of the fifties, plastered
   { bw: 3.4, base: 1.2, front: 'bwbswbwb', back: 'wbwbbwbw', side: 'wbbw', mat: M_PANEL, top: 1.5, fh: 3 }, // a new tower (seed 2 and up: coloured panels)
+  // a khrushchyovka: the first panel five-storeys, small windows, open balconies with iron railings, no lift (seed 1..2)
+  { bw: 2.9, base: 0.6, front: 'wbwswbw', back: 'wwbwbww', side: 'nwwn', mat: M_PANEL, top: 0.45, ww: 1.3, wh: 1.35, rail: 1, glaze: 0.3, nolift: 1 },
+  // a tower of the new expensive kind: glass from floor to ceiling (g), loggias behind glass balustrades, bronze fins up
+  // the walls, a lobby and shops of glass on a tall ground floor, a lit crown on top (seed 5..8: the cladding)
+  { bw: 3.4, base: 4.4, front: 'gbgsgbgg', back: 'gbggggbg', side: 'gbbg', mat: M_PANEL, top: 3.2, fh: 3.25, modern: 1 },
 ];
 // x, z (centre), yaw (0: the yard side faces south), type, floors, sections, palette of doors and balconies, seed (< .5 pale brick)
 const BLD = [
@@ -32,22 +37,22 @@ const BLD = [
   [62, -112, 0, 1, 9, 2, 10, 0.3], // C
   [92, -30, -PI / 2, 0, 5, 3, 11, 0.33], // D
   [66, 6, PI / 2, 2, 1, 1, 9, 0.7], // E: the low building east of the playground
-  [-84, -84, PI / 2, 1, 9, 2, 10, 0.45], [-86, 14, PI / 2, 0, 5, 4, 11, 0.17], [-66, -112, 0, 0, 5, 3, 9, 0.6], // the far ring
-  [136, -96, 0, 1, 9, 1, 11, 0.35], [140, 30, -PI / 2, 0, 5, 4, 10, 0.24], [-50, 98, 0, 0, 5, 4, 9, 0.66], [70, 104, 0, 1, 9, 2, 10, 0.4],
+  [-84, -84, PI / 2, 1, 9, 2, 10, 0.45], [-86, 14, PI / 2, 5, 5, 4, 11, 1.17], [-66, -112, 0, 5, 5, 3, 9, 1.6], // the far ring
+  [136, -96, 0, 1, 9, 1, 11, 0.85], [140, 30, -PI / 2, 0, 5, 4, 10, 0.24], [-50, 98, 0, 5, 5, 4, 9, 1.66], [70, 104, 0, 1, 9, 2, 10, 0.4],
   // the old quarter to the west: two-storey houses round courtyards (palette = the colour of the plaster)
   [-320, -40, 0, 3, 2, 2, 6, 0.3], [-320, 10, PI, 3, 2, 2, 0, 0.5], [-375, -15, PI / 2, 3, 2, 2, 6, 0.7], [-275, -15, -PI / 2, 3, 2, 2, 15, 0.2],
   [-320, 55, 0, 3, 2, 2, 0, 0.6], [-320, 105, PI, 3, 2, 2, 6, 0.1], [-375, 80, PI / 2, 3, 2, 2, 15, 0.8], [-295, -88, 0, 3, 2, 2, 6, 0.4], [-355, -88, 0, 3, 2, 2, 0, 0.9],
   // five-storeys on the avenue in the centre
   [222, 15, PI / 2, 0, 5, 2, 10, 0.25], [222, 95, PI / 2, 0, 5, 2, 9, 0.62],
   // the new towers south of the river
-  [190, 350, 0, 4, 22, 1, 11, 2.3], [278, 350, 0, 4, 22, 1, 5, 2.7], [190, 458, PI, 4, 22, 1, 4, 3.1], [278, 458, PI, 4, 22, 1, 14, 3.6],
+  [190, 350, 0, 6, 24, 1, 11, 5.2], [278, 350, 0, 6, 30, 1, 5, 6.4], [190, 458, PI, 6, 20, 1, 4, 7.1], [278, 458, PI, 6, 27, 1, 14, 5.7],
   // more of the old quarter: a third column of courtyards to the west, one more house on the north street
   [-440, -40, 0, 3, 3, 2, 0, 0.35], [-440, 10, PI, 3, 2, 2, 6, 0.55], [-495, -15, PI / 2, 3, 2, 2, 15, 0.75],
   [-440, 55, 0, 3, 2, 2, 15, 0.45], [-440, 105, PI, 3, 3, 2, 0, 0.15], [-495, 80, PI / 2, 3, 2, 2, 6, 0.85], [-415, -88, 0, 3, 3, 2, 0, 0.65],
   // the centre: five-storeys behind the police and the club, two panel towers behind the administration, one on the avenue
-  [400, -100, 0, 0, 5, 2, 11, 0.3], [455, -20, -PI / 2, 1, 9, 1, 10, 0.5], [455, 30, -PI / 2, 1, 9, 1, 11, 0.6], [378, 95, PI, 0, 5, 2, 9, 0.7], [378, 130, 0, 0, 5, 2, 10, 0.2], [222, -60, PI / 2, 0, 5, 2, 11, 0.4],
+  [400, -100, 0, 5, 5, 2, 11, 1.3], [455, -20, -PI / 2, 1, 9, 1, 10, 0.5], [455, 30, -PI / 2, 1, 9, 1, 11, 0.9], [378, 95, PI, 0, 5, 2, 9, 0.7], [378, 130, 0, 0, 5, 2, 10, 0.2], [222, -60, PI / 2, 0, 5, 2, 11, 0.4],
   // south of the river: two more new towers, panel nine-storeys along the road, five-storeys on the far street
-  [360, 350, 0, 4, 22, 1, 13, 2.5], [360, 458, PI, 4, 22, 1, 7, 3.3], [95, 360, PI / 2, 1, 9, 2, 10, 0.55], [95, 440, PI / 2, 1, 9, 2, 11, 0.35], [200, 530, PI, 0, 5, 2, 9, 0.5], [270, 530, PI, 0, 5, 2, 10, 0.8],
+  [360, 350, 0, 6, 18, 1, 13, 6.9], [360, 458, PI, 6, 24, 1, 7, 7.5], [95, 360, PI / 2, 1, 9, 2, 10, 0.55], [95, 440, PI / 2, 1, 9, 2, 11, 0.8], [200, 530, PI, 5, 5, 2, 9, 1.5], [270, 530, PI, 5, 5, 2, 10, 1.8],
 ].map(([x, z, yaw, t, fl, sec, pal, sd]) => {
   const T = BT[t], L = T.front.length * sec * T.bw, D = T.side.length * T.bw, [cx, cz] = rotY(-L / 2, -D / 2, yaw), fh = T.fh || FH;
   return { x: x + cx, z: z + cz, yaw, t, fl, sec, pal, sd, T, L, D, fh, H: T.base + fl * fh + T.top, cx: x, cz: z };
@@ -159,7 +164,7 @@ const cellOf = (x, z) => clamp(floor((x - OX) / CELLW), 0, CELLS - 1) + CELLS * 
 // The walls are cut into bays, every bay a vertical strip with its window holes and their reveals. Returns the mesh
 // (in the building's own frame, origin at a corner) and the list of window panes for the window shader.
 function meshBuilding(b, room) {
-  const m = new Mesh(), T = b.T, bw = T.bw, fh = b.fh, W = [], panel = T.mat === M_PANEL, ww = panel ? 1.8 : 1.45, wh = panel ? 1.45 : 1.5, RD = 0.22, H = b.H;
+  const m = new Mesh(), T = b.T, bw = T.bw, fh = b.fh, W = [], panel = T.mat === M_PANEL, ww = T.ww || (panel ? 1.8 : 1.45), wh = T.wh || (panel ? 1.45 : 1.5), RD = T.modern ? 0.12 : 0.22, H = b.H, MOD = T.modern;
   // strip of wall u0..u1 from y0 to the top with holes [a0, a1, b0, b1, depth], bottom to top
   const strip = (u0, u1, y0, holes) => {
     let y = y0;
@@ -179,12 +184,30 @@ function meshBuilding(b, room) {
     for (let i = 0; i < pat.length; i++) {
       const u0 = i * bw, u1 = u0 + bw, uc = u0 + bw / 2, k = pat[i], holes = [], hb = bw / 2 - 0.3, dep = 1.15;
       const mine = room && ((s === 0 && i === RSEC * 7 + RBAY) || AWIN.some(([ws, wu]) => ws === s && abs((s ? b.L - wu : wu) - uc) < 0.1)), bal = room && s === 0 && abs(uc - ABAL[2]) < 0.1;
-      if (k === 's') {
+      if (k === 's' && MOD) {
+        // the lobby: glass the whole height of the ground floor, a thin slab cantilevered over the door, lights set in
+        // its underside; above, a strip of glass up the stairs
+        holes.push([uc - 1.45, uc + 1.45, 0.13, T.base - 0.3, RD]); W.push([s, uc, (T.base - 0.17) / 2 + 0.13, -RD, 2.9, T.base - 0.43, 0, 0, 48]);
+        for (let f = 0; f < b.fl; f++) { const y = T.base + f * fh; holes.push([uc - 0.8, uc + 0.8, y + 0.2, y + fh - 0.2, RD]); W.push([s, uc, y + fh / 2, -RD, 1.6, fh - 0.4, 2, 0]); }
+        m.mat(M_METAL).box(uc - 2.2, T.base - 0.3, 0, uc + 2.2, T.base - 0.15, 2.4, 0, 0.5, 1); m.mat(M_CONC).box(uc - 2.2, 0, 0, uc + 2.2, 0.13, 2.6, 4, 0.7, 1);
+        m.mat(M_LAMP); for (const x of [-1.6, 0, 1.6]) m.box(uc + x - 0.12, T.base - 0.31, 1.0, uc + x + 0.12, T.base - 0.3, 1.24, 0);
+      } else if (k === 's') {
         // door, steps, canopy on two posts; the stair windows sit half a floor off the others
         holes.push([uc - 0.7, uc + 0.7, 0.13, 2.25, RD]);
         for (let f = 1; f < b.fl; f++) { const y = T.base + f * fh - 0.8; holes.push([uc - 0.6, uc + 0.6, y, y + 1.2, RD]); W.push([s, uc, y + 0.6, -RD, 1.2, 1.2, 2, 0]); }
         m.mat(M_CONC).box(uc - 1.6, 2.5, 0, uc + 1.6, 2.64, 1.6, 0, 0.4, 1); m.box(uc - 1.6, 0, 0, uc + 1.6, 0.13, 1.7, 4, 0.7, 1);
         m.mat(M_METAL); m.bar([uc - 1.5, 0.13, 1.5], [uc - 1.5, 2.5, 1.5], 0.06); m.bar([uc + 1.5, 0.13, 1.5], [uc + 1.5, 2.5, 1.5], 0.06);
+      } else if (MOD) {
+        // the ground floor: shop windows of glass, lit; then glass from floor to ceiling, or a loggia behind a glass balustrade
+        holes.push([u0 + 0.2, u1 - 0.2, 0.35, T.base - 0.35, RD]); W.push([s, uc, T.base / 2, -RD, bw - 0.4, T.base - 0.7, 0, 0, 48]);
+        for (let f = 0; f < b.fl; f++) {
+          const y0 = T.base + f * fh;
+          if (k === 'b') {
+            // a loggia: the glass set back 1.2 m, the slab's edge, a glass balustrade on a thin rail at the front
+            holes.push([u0 + 0.12, u1 - 0.12, y0, y0 + fh - 0.15, -1.2]); W.push([s, uc, y0 + (fh - 0.15) / 2, -1.2, bw - 0.24, fh - 0.15, 0, 0]);
+            m.mat(M_LENS).box(u0 + 0.14, y0 + 0.02, -0.06, u1 - 0.14, y0 + 1.05, -0.04, 0, 1, 1); m.mat(M_METAL).box(u0 + 0.12, y0 + 1.05, -0.08, u1 - 0.12, y0 + 1.09, -0.02, 0, 1, 1);
+          } else { holes.push([u0 + 0.16, u1 - 0.16, y0 + 0.12, y0 + fh - 0.18, RD]); W.push([s, uc, y0 + 0.12 + (fh - 0.3) / 2, -RD, bw - 0.32, fh - 0.3, 0, 0]); }
+        }
       } else {
         m.mat(M_CONC).q4([u0, 0, 0], [u1, 0, 0], [u1, T.base, 0], [u0, T.base, 0], [0.5, 0.5, 0.9, 0.9]);
         for (let f = 0; f < b.fl; f++) {
@@ -192,15 +215,23 @@ function meshBuilding(b, room) {
           if (k === 'w' || (k === 'b' && !f)) {
             holes.push([uc - ww / 2, uc + ww / 2, y0 + 0.95, y0 + 0.95 + wh, mine && f === RFL ? -RD0 : RD]);
             if (!(mine && f === RFL)) W.push([s, uc, yc, -RD, ww, wh, 0, 0]);
-            m.mat(M_CONC).box(uc - ww / 2 - 0.05, y0 + 0.91, -0.04, uc + ww / 2 + 0.05, y0 + 0.95, 0.07, 16); // sill
+            m.mat(M_CONC).box(uc - ww / 2 - 0.05, y0 + 0.91, -0.04, uc + ww / 2 + 0.05, y0 + 0.95, T.rail ? 0.12 : 0.07, 16); // sill
             if (ihash(i, f, s + b.fl * 7) < 0.07 && !mine) m.mat(M_CONC).box(uc - 0.4, y0 + 0.3, 0.02, uc + 0.4, y0 + 0.85, 0.34, 16, 0.6, 1); // air conditioner
           } else if (k === 'b') {
             // balcony: slab, parapet, then glazing all round (most of them) or the open air and the window behind
-            const own = bal && f === RFL, glazed = !own && ihash(i, f, s + 31) < 0.72;
+            const own = bal && f === RFL, glazed = !own && ihash(i, f, s + 31) < (T.glaze ?? 0.72);
             if (own) holes.push([ABAL[0], ABAL[1], y0, y0 + 2.1, -RD0]);
             m.mat(M_CONC).box(uc - hb, y0 - 0.14, 0, uc + hb, y0, dep, 16, 0.45, 0.8);
-            m.mat(panel ? M_PANEL : M_TINT).box(uc - hb, y0, dep - 0.06, uc + hb, y0 + 1, dep, 0, 0.7, 1);
-            m.box(uc - hb, y0, 0, uc - hb + 0.06, y0 + 1, dep - 0.06, 16 | 32, 0.7, 1); m.box(uc + hb - 0.06, y0, 0, uc + hb, y0 + 1, dep - 0.06, 16 | 32, 0.7, 1);
+            if (T.rail && !glazed) {
+              // an iron railing: a top rail, a bottom one, thin bars between, a sheet of corrugated steel on some
+              m.mat(M_METAL);
+              for (const [a, c] of [[[uc - hb, dep - 0.04], [uc + hb, dep - 0.04]], [[uc - hb + 0.03, 0.05], [uc - hb + 0.03, dep - 0.04]], [[uc + hb - 0.03, 0.05], [uc + hb - 0.03, dep - 0.04]]]) { m.bar([a[0], y0 + 1, a[1]], [c[0], y0 + 1, c[1]], 0.04); m.bar([a[0], y0 + 0.08, a[1]], [c[0], y0 + 0.08, c[1]], 0.025); }
+              for (let x = uc - hb + 0.12; x < uc + hb - 0.05; x += 0.14) m.bar([x, y0, dep - 0.04], [x, y0 + 1, dep - 0.04], 0.014);
+              if (ihash(i, f, s + 5) < 0.4) m.mat(M_TINT).box(uc - hb + 0.02, y0 + 0.1, dep - 0.07, uc + hb - 0.02, y0 + 0.95, dep - 0.055, 0, 0.7, 1);
+            } else {
+              m.mat(panel ? M_PANEL : M_TINT).box(uc - hb, y0, dep - 0.06, uc + hb, y0 + 1, dep, 0, 0.7, 1);
+              m.box(uc - hb, y0, 0, uc - hb + 0.06, y0 + 1, dep - 0.06, 16 | 32, 0.7, 1); m.box(uc + hb - 0.06, y0, 0, uc + hb, y0 + 1, dep - 0.06, 16 | 32, 0.7, 1);
+            }
             if (glazed) {
               W.push([s, uc, y0 + 1.72, dep - 0.03, hb * 2, 1.44, 1, 0], [s, uc - hb + 0.03, y0 + 1.72, dep / 2, dep, 1.44, 1, -PI / 2], [s, uc + hb - 0.03, y0 + 1.72, dep / 2, dep, 1.44, 1, PI / 2]);
             } else if (!own) W.push([s, uc, y0 + 1.6, 0.03, 2, 1.7, 0, 0]);
@@ -209,10 +240,14 @@ function meshBuilding(b, room) {
         }
       }
       m.mat(T.mat);
-      strip(u0, u1, k === 's' ? 0 : T.base, holes);
+      strip(u0, u1, k === 's' || MOD ? 0 : T.base, holes);
+      // the new towers: a bronze fin up every other joint of the bays, standing out from the glass
+      if (MOD && i && (i & 1) === 0) m.mat(M_YEL).box(u0 - 0.06, T.base, 0, u0 + 0.06, H - 0.4, 0.55, 4, 0.6, 1);
     }
+    // a line of light up each corner of the new towers
+    if (MOD) { m.mat(M_LAMP).box(0.02, T.base, 0.02, 0.1, H, 0.1, 0); m.box(pat.length * bw - 0.1, T.base, 0.02, pat.length * bw - 0.02, H, 0.1, 0); }
     // downpipes at the section joints of the long walls
-    if (s < 2) for (let i = 0; i <= b.sec; i++) { const u = clamp(i * b.L / b.sec, 0.25, b.L - 0.25); m.mat(M_METAL).tube([[u, H - 0.2, 0.12], [u, 0.5, 0.12], [u, 0.18, 0.4]], 0.06, 5, 0); }
+    if (s < 2 && !MOD) for (let i = 0; i <= b.sec; i++) { const u = clamp(i * b.L / b.sec, 0.25, b.L - 0.25); m.mat(M_METAL).tube([[u, H - 0.2, 0.12], [u, 0.5, 0.12], [u, 0.18, 0.4]], 0.06, 5, 0); }
   }
   m.at(0, 0, 0);
   if (T.pitch) {
@@ -220,12 +255,19 @@ function meshBuilding(b, room) {
     const r = H + 2.7, e = 0.5;
     m.mat(M_METAL).q4([-e, H - 0.12, -e], [b.L + e, H - 0.12, -e], [b.L + e, r, b.D / 2], [-e, r, b.D / 2], 0.9); m.q4([b.L + e, H - 0.12, b.D + e], [-e, H - 0.12, b.D + e], [-e, r, b.D / 2], [b.L + e, r, b.D / 2], 0.9);
     m.mat(T.mat); for (const x of [0, b.L]) m.tri(m.v(x, H, 0), m.v(x, H, b.D), m.v(x, r - 0.08, b.D / 2));
+  } else if (MOD) {
+    // the crown: the walls run on past the roof as a screen, a line of light round its top, a glass pavilion on the roof
+    m.mat(M_DARK).q4([0, H - T.top, 0], [0, H - T.top, b.D], [b.L, H - T.top, b.D], [b.L, H - T.top, 0], 0.8);
+    m.mat(M_PANEL); for (const [a, c] of [[[0, 0], [b.L, 0.3]], [[0, b.D - 0.3], [b.L, b.D]], [[0, 0], [0.3, b.D]], [[b.L - 0.3, 0], [b.L, b.D]]]) m.box(a[0], H - T.top, a[1], c[0], H - 0.2, c[1], 4, 0.6, 1);
+    m.mat(M_LAMP); m.box(-0.05, H - 0.2, -0.05, b.L + 0.05, H - 0.1, 0.05, 4); m.box(-0.05, H - 0.2, b.D - 0.05, b.L + 0.05, H - 0.1, b.D + 0.05, 4);
+    m.box(-0.05, H - 0.2, 0, 0.05, H - 0.1, b.D, 4); m.box(b.L - 0.05, H - 0.2, 0, b.L + 0.05, H - 0.1, b.D, 4);
+    m.mat(M_GLASS).box(b.L * 0.3, H - T.top, b.D * 0.3, b.L * 0.7, H - T.top + 2.6, b.D * 0.7, 4, 0.8, 1);
   } else {
     m.mat(M_DARK).q4([0, H - 0.35, 0], [0, H - 0.35, b.D], [b.L, H - 0.35, b.D], [b.L, H - 0.35, 0], 0.8);
     rseed(300 + b.fl + b.sec * 9 + (b.L | 0));
     for (let i = 0; i < b.sec; i++) {
       const x = (i + 0.5) * b.L / b.sec;
-      if (panel) m.mat(M_PANEL).box(x - 3.2, H - 0.35, b.D / 2 - 2.6, x + 3.2, H + 2.5, b.D / 2 + 2.6, 4, 0.6, 1); // lift machinery
+      if (panel && !T.nolift) m.mat(M_PANEL).box(x - 3.2, H - 0.35, b.D / 2 - 2.6, x + 3.2, H + 2.5, b.D / 2 + 2.6, 4, 0.6, 1); // lift machinery
       else { m.mat(M_BRICK).box(x - 2.4, H - 0.35, b.D / 2 - 0.45, x - 1.5, H + 1.1, b.D / 2 + 0.45, 4, 0.6, 1); m.mat(M_METAL).box(x + 3, H - 0.35, 2.5, x + 3.5, H + 0.35, 3, 4); }
       // old aerials
       const ax = x + rr(-5, 5), az = rr(2, b.D - 2), ah = rr(2.5, 4.5); m.mat(M_METAL).bar([ax, H - 0.35, az], [ax, H + ah, az], 0.035);
@@ -624,7 +666,7 @@ function makeWorld() {
     const key = i ? 'b' + b.t + b.fl + b.sec : 'home';
     if (!made[key]) { made[key] = meshBuilding(b, !i); reg(key, made[key].m); }
     solid(key, b.x, 0, b.z, b.yaw, b.pal, b.sd, b.T.bw);
-    for (const [s, u, y, z, w, h, ty, dy] of made[key].W) { const p = toW(b, s, u, y, z, dy); wins.push(p[0], p[1], p[2], p[3], w, h, ihash(wins.length, i, 7), ty); winB.push(i * 4 + s); }
+    for (const [s, u, y, z, w, h, ty, dy, lit] of made[key].W) { const p = toW(b, s, u, y, z, dy); wins.push(p[0], p[1], p[2], p[3], w, h, ihash(wins.length, i, 7), lit ?? ty); winB.push(i * 4 + s); }
     // somebody smokes on an open balcony of the house across the yard: the ember of the cigarette
     if (i === 1) { const o = made[key].W.find((e) => e[3] === 0.03 && e[2] > 9 && !e[0]), p = toW(b, 0, o[1] + 0.45, o[2] - 0.12, 0.98); glare.push(p[0], p[1], p[2], 0.07, 3.2, 0.8, 0.15, 2); }
     const c0 = toW(b, 0, 0, 0, 0), c1 = toW(b, 1, 0, 0, 0);

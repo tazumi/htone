@@ -135,12 +135,12 @@ function town(o) {
       // a garland behind balcony glass
       if (ty === 1 && zz > 0.5 && rnd() < 0.07) garland(toW(b, s, u - w / 2 + 0.15, y + 0.62, zz - 0.06), toW(b, s, u + w / 2 - 0.15, y + 0.62, zz - 0.06), 0.06, 0.22);
       // a grille over a window of the ground floor (more of them on some houses than others)
-      if (ty === 0 && zz < 0 && y < 4 && rnd() < ihash(i, 3, 17) * 0.9) { const p = toW(b, s, u, y - h / 2 - 0.02, 0); solid(w > 1.6 ? 'grille1' : 'grille0', p[0], p[1], p[2], p[3]); }
+      if (ty === 0 && zz < 0 && y < 4 && b.t !== 6 && rnd() < ihash(i, 3, 17) * 0.9) { const p = toW(b, s, u, y - h / 2 - 0.02, 0); solid(w > 1.6 ? 'grille1' : 'grille0', p[0], p[1], p[2], p[3]); }
       // a satellite dish beside a window
       if (ty === 0 && zz < 0 && rnd() < 0.08 && y > 3) { const p = toW(b, s, u + w / 2 + 0.45, y + 0.2, 0); solid('dish', p[0], p[1], p[2], p[3], 0, rnd()); }
     }
-    if (b.t === 0) { const p = toW(b, rnd() < 0.5 ? 2 : 3, b.D * rr(0.25, 0.75), 0, 0); solid('ladder', p[0], 0, p[2], p[3]); }
-    if (b.t < 2 || b.t === 4) {
+    if (b.t === 0 || b.t === 5) { const p = toW(b, rnd() < 0.5 ? 2 : 3, b.D * rr(0.25, 0.75), 0, 0); solid('ladder', p[0], 0, p[2], p[3]); }
+    if (b.t < 2 || b.t === 4 || b.t === 5) {
       // on the roof: vent shafts, aerials, pigeons along the parapet; the lift motor hums under the panel houses' huts
       const roof = (x, zz) => { const [wx, wz] = rotY(x, zz, b.yaw); return [b.x + wx, b.z + wz]; };
       for (let k = 0; k < b.sec; k++) {

@@ -276,10 +276,12 @@ function districts(o) {
   // a playground, the cars of people with money
   rseed(114);
   {
-    BLD.forEach((b, bi) => { if (b.t !== 4) return;
+    BLD.forEach((b, bi) => { if (b.t !== 4 && b.t !== 6) return;
       const side = 0, sh = [[5, 'shopWin', 'signMarket'], [6.5, 'pharmWin', 'signCoffee'], [5, 'shopWin', 'signFlowers'], [6.5, 'pharmWin', 'signMarket']][bi % 4];
-      const u = b.L - 7.6, w = 7.4; const p = toW(b, side, u, 2.5, 0.06), q = toW(b, side, u, 4.6, 0.07);
-      decals.push(p[0], p[1], p[2], p[3], w, 2.4, 1, 1.1, sh[1], q[0], q[1], q[2], q[3], 4.2, 0.8, 2, 2.8, sh[2]);
+      // the glass towers have their shops behind their own glass: only the sign over it, under the first floor
+      const u = b.L - 7.6, w = 7.4, q = toW(b, side, u, b.t === 6 ? b.T.base - 0.55 : 4.6, 0.07);
+      if (b.t === 4) { const p = toW(b, side, u, 2.5, 0.06); decals.push(p[0], p[1], p[2], p[3], w, 2.4, 1, 1.1, sh[1]); }
+      decals.push(q[0], q[1], q[2], q[3], 4.2, 0.8, 2, 2.8, sh[2]);
     });
     put('playset', 234, 404, 0.2, 0, 0, [2.6, 3, 3.8]); put('sandbox', 222, 412, 0.1); put('swing', 248, 410, 0.2, 5);
     for (const [x, z, a] of [[214, 400, PI / 2], [256, 398, -PI / 2], [234, 416, PI]]) put('bench', x, z, a, 8, x);
@@ -341,7 +343,7 @@ function districts(o) {
     put('standing', 485, -82, -2.2, 15); put('standing', 483.6, -80.7, 0.9, 15); snd.push(['chat', 484.5, 1.6, -81.5]);
     { const S = R6('smoker'), [px, pz, pa] = [458, 107.5, 2.8]; put('smoker', px, pz, pa, 13); const e = at(px, pz, pa, S.ember); glare.push(e[0], gy(px, pz) + e[1], e[2], 0.07, 3.2, 0.8, 0.15, 2); }
     // at the shops under the towers
-    BLD.forEach((b) => { if (b.t !== 4) return; const p = toW(b, 0, b.L - 7.6 + rr(-2, 2), 0, rr(1.6, 2.6)); put(pick(['girl', 'standing', 'walkerW']), p[0], p[2], p[3] + rr(-1.2, 1.2), coat()); if (rnd() < 0.6) { const q = toW(b, 0, b.L - 12, 0, 3); put('talkers', q[0], q[2], p[3] + PI / 2, coat()); snd.push(['chat', q[0], 1.6, q[2]]); } });
+    BLD.forEach((b) => { if (b.t !== 4 && b.t !== 6) return; const p = toW(b, 0, b.L - 7.6 + rr(-2, 2), 0, rr(1.6, 2.6)); put(pick(['girl', 'standing', 'walkerW']), p[0], p[2], p[3] + rr(-1.2, 1.2), coat()); if (rnd() < 0.6) { const q = toW(b, 0, b.L - 12, 0, 3); put('talkers', q[0], q[2], p[3] + PI / 2, coat()); snd.push(['chat', q[0], 1.6, q[2]]); } });
   }
 
   // ---------------------------------------------------------------- the lamps placed above
