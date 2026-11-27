@@ -153,7 +153,16 @@ function town(o) {
     }
   });
   // the street and the number of every house on its corner, by the yard side
-  BLD.forEach((b, i) => { if (b.t === 2) return; dec(toW(b, 0, b.L - 0.9, b.T.base + 2.2, 0.02), 0.62, 0.39, 0, 0, 'hnum' + (i * 5 % 6)); });
+  // (the lit ones glow; the tall houses carry a big one high on each end wall too, to be read from far off)
+  BLD.forEach((b, i) => {
+    const hn = HNUM[i]; if (!hn) return; const lit = hn[2] === 1;
+    if (!b.T.modern) dec(toW(b, 0, b.L - 0.9, b.T.base + 2.2, 0.02), 0.62, 0.35, lit ? 1 : 0, 0.9, 'hn' + i);
+    if (b.fl < 9) return;
+    // on a blank bay of the end wall under the roof, or else on the parapet over the middle
+    const sp = b.T.side, ns = [...sp].map((c, k) => (c === 'n' ? k : -1)).filter((k) => k >= 0).sort((p, q) => abs(p - sp.length / 2) - abs(q - sp.length / 2));
+    const u = ns.length ? (ns[0] + 0.5) * b.T.bw : b.D / 2, y = ns.length ? b.H - b.T.top - 1.6 : b.H - b.T.top / 2, hh = ns.length ? 1.46 : min(1.46, b.T.top - 0.3);
+    for (const s of [2, 3]) dec(toW(b, s, u, y, 0.03), hh * 1.78, hh, 1, 0.75, 'hn' + i);
+  });
   // the clock on the end wall of the tower C, lit
   { const b = BLD[3], p = toW(b, 2, b.D / 2, 21, 0.02); dec(p, 1.6, 1.6, 1, 0.55, 'clockBig'); }
 

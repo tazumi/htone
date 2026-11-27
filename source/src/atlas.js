@@ -10,7 +10,7 @@ function makeAtlas() {
   const c = cv.getContext('2d'), R = {};
   rseed(77);
   // the cells are collected first, then packed tallest first in rows (8 px apart so the mip levels do not bleed)
-  const cells = [];
+  const cells = []; let used = 0;
   const cell = (name, w, h, draw) => cells.push({ name, w, h, draw });
   const pack = () => {
     let px = 0, py = 0, rowH = 0;
@@ -21,6 +21,7 @@ function makeAtlas() {
       R[name] = [px / ATLAS, py / ATLASH, (px + w) / ATLAS, (py + h) / ATLASH];
       px += w + 8; rowH = max(rowH, h);
     }
+    used = py + rowH;
   };
   const FB = '"Arial Black", "Segoe UI Black", Impact, sans-serif', FN = 'Arial, "Segoe UI", sans-serif', FC = '"Courier New", monospace';
   // text fitted into a width
@@ -385,9 +386,14 @@ function makeAtlas() {
   });
   cell('sNoAds', 256, 64, (w, h) => { c.fillStyle = 'rgba(20,20,20,.85)'; c.textAlign = 'center'; c.font = `bold 26px ${FB}`; c.fillText('РЕКЛАМУ', w / 2, 26); c.fillText('НЕ КЛЕИТЬ', w / 2, 56); c.fillStyle = 'rgba(20,20,20,.3)'; for (let k = 0; k < 30; k++) c.fillRect(rr(0, w), rr(0, h), 2, 2); });
   cell('sCode', 128, 48, (w, h) => { c.strokeStyle = 'rgba(30,30,40,.8)'; c.lineWidth = 3; c.font = `italic 30px ${FN}`; c.fillStyle = 'rgba(30,30,60,.85)'; c.fillText('К1379', 6, 36); });
-  ['ул. Садовая', 'ул. Ленина', 'ул. Мира', 'ул. Школьная', 'пр. Строителей', 'ул. Лесная'].forEach((st, i) => cell('hnum' + i, 192, 120, (w, h) => {
-    c.fillStyle = '#1a3a8a'; c.fillRect(0, 0, w, h); c.strokeStyle = '#e8e8e8'; c.lineWidth = 5; c.strokeRect(5, 5, w - 10, h - 10);
-    c.fillStyle = '#fff'; c.textAlign = 'center'; fit(st, FN, 22, w - 24, 'bold'); c.fillText(st, w / 2, 34); c.font = `bold 62px ${FN}`; c.fillText(String([12, 7, 24, 3, 16, 9][i]), w / 2, 100);
+  // the address plates of the houses (HNUM in world.js): enamel blue or green, a white box lit from inside, dark wood
+  // with gilt for the old quarter
+  HNUM.forEach((hn, i) => hn && cell('hn' + i, 128, 72, (w, h) => {
+    const [st, num, k] = hn, [bg, fg, ed] = [['#1a3a8a', '#fff', '#e8e8e8'], ['#f2efe6', '#1a1a1a', '#2050a0'], ['#1d4a2a', '#f4f0e0', '#d8d8c8'], ['#2a1a0c', '#e0b860', '#a08040']][k];
+    c.fillStyle = bg; if (k === 1) c.fillRect(0, 0, w, h); else { c.beginPath(); c.roundRect(2, 2, w - 4, h - 4, k === 3 ? 4 : 10); c.fill(); }
+    c.strokeStyle = ed; c.lineWidth = k === 1 ? 0 : 3; if (k !== 1) { c.beginPath(); c.roundRect(6, 6, w - 12, h - 12, 7); c.stroke(); } else { c.fillStyle = ed; c.fillRect(0, 0, w, 16); }
+    c.textAlign = 'center'; c.fillStyle = k === 1 ? '#fff' : fg; fit(st, k === 3 ? 'Georgia, serif' : FN, 13, w - 22, 'bold'); c.fillText(st, w / 2, k === 1 ? 13 : 21);
+    c.fillStyle = fg; fit(num, k === 3 ? 'Georgia, serif' : FN, 40, w - 24, 'bold'); c.fillText(num, w / 2, h - 12);
   }));
   for (let i = 0; i < 3; i++) cell('scr' + i, 128, 192, (w, h) => {
     // scratches and scuffs on a painted steel door: pale lines, a dent, the paint chipped
@@ -511,5 +517,5 @@ function makeAtlas() {
     for (const x of [6, 82]) c.fillRect(x, 0, 8, h);
   });
   pack();
-  return { cv, R };
+  return { cv, R, used };
 }

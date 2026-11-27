@@ -313,6 +313,47 @@ struct VO { @builtin(position) cp: vec4f, @location(0) wp: vec3f, @location(1) n
   o.m = i.c; o.mat = ai >> 3u; o.ao = select(sh, 1., an == 1);
   return o;
 }
+// every house its own face (the walls of brick and panel houses; bw the bay width, which with the material tells the
+// kind of house and so its floors): rust and soot run down from the sills, more on the houses nobody looks after; some
+// flats have had their bit of wall insulated and rendered in a colour of their own; a painted end wall on some houses,
+// in big shapes of colour; the foot of the wall splashed dark
+fn facade(a: vec3f, wu: vec2f, fw: vec2f, brick: bool, bw: f32, sd: f32, gable: bool, n: f32) -> vec3f {
+  let base = select(select(select(1.2, .9, bw < 3.3), .6, bw < 3.), 1.1, brick); let fh = select(2.8, 3., !brick && bw > 3.3);
+  let ww = select(select(1.8, 1.3, bw < 3.), 1.45, brick); let aa = max(fw.x, fw.y);
+  let bx = floor(wu.x / bw); let lx = wu.x - (bx + .5) * bw; let fy = floor((wu.y - base) / fh); let ly = wu.y - base - fy * fh;
+  let H1 = hs(sd * 17.3 + 2.1); let H2 = hs(sd * 29.7 + .3); let H3 = hs(sd * 41.1 + 5.5);
+  var c = a; let L = dot(a, vec3f(.3, .55, .15));
+  if (gable && H1 > .45 && wu.y > base) {
+    // the end wall painted: diagonal bands, stacked blocks, or one tall stripe of colour with a white edge
+    let C = array<vec3f, 6>(vec3f(.44, .17, .09), vec3f(.48, .35, .11), vec3f(.08, .30, .32), vec3f(.10, .19, .40), vec3f(.50, .50, .47), vec3f(.30, .40, .18));
+    let k = u32(H2 * 5.99); let A = C[k]; let B = C[(k + 1u + u32(H3 * 3.99)) % 6u]; var m = 0.; var e = 1.;
+    if (H1 < .63) { let t = (wu.x * .7 + wu.y) / 7.; m = step(.5, fract(t)); }
+    else if (H1 < .8) { let t = wu.y / 8.4 + .25 * sin(wu.x * .45 + sd * 9.); m = step(.5, fract(t)); }
+    else { let t = abs(fract(wu.x / (bw * 3.) + H3) - .5); m = step(t, .2); e = ss(.0, .04 + aa, abs(t - .2) * bw * 3. - .12); c = mix(c, vec3f(.5, .5, .48) * (L / .22), 1. - e); }
+    c = mix(c, mix(A, B, m) * clamp(L / .22, .55, 1.3), e * .92);
+  }
+  if (fy >= 0.) {
+    // a flat insulated on its own: the bay (or two) of one storey, its render smooth and pale, a dark edge round it
+    let pr = select(0., .04 + .1 * H3, H3 > .3); let b2 = floor(bx / select(1., 2., H2 > .5)); let q = hs(b2 * 7.13 + fy * 3.71 + sd * 13.1);
+    if (q < pr) {
+      let C = array<vec3f, 5>(vec3f(.56, .37, .26), vec3f(.56, .48, .26), vec3f(.32, .47, .40), vec3f(.60, .58, .54), vec3f(.46, .26, .19));
+      let ex = min(abs(lx + bw * .5), abs(lx - bw * .5)); let ey = min(ly, fh - ly);
+      let edge = ss(.0, .05 + aa, min(select(ex, 9., H2 > .5 && fract(bx * .5) < .25), ey));
+      c = C[u32(hs(q * 91.7) * 4.99)] * (.88 + .18 * n) * mix(.55, 1., edge);
+    }
+    // streaks down from the sills: rust from the bars, soot, a wet line under each corner of the sill
+    let k = hs(bx * 3.7 + fy * 11.3 + sd * 5.); let dirt = .3 + .7 * H2;
+    let sx = abs(lx - (k - .5) * ww * .8 + .03 * sin(ly * 7. + k * 20.)); let dy = .95 - ly;
+    let st = (1. - ss(.0, .1 + aa * 2., sx)) * ss(-.02, .08, dy) * ss(.6 + 1.6 * k, 0., dy) * step(.3, k);
+    // and under the whole sill a soft grey wash where the rain runs off it
+    let wash = (1. - ss(ww * .35, ww * .55 + aa, abs(lx))) * ss(-.02, .1, dy) * ss(1.2, .0, dy) * step(.45, H2);
+    c *= 1. - .35 * wash * dirt;
+    c = mix(c, c * select(vec3f(.3, .28, .27), vec3f(.6, .38, .25), k > .65), st * dirt * (.7 + .3 * n));
+  }
+  // splashed dark at the foot
+  if (!brick) { c *= mix(.62, 1., ss(.0, 1.1, wu.y - .1)); }
+  return c;
+}
 fn pal(i: f32) -> vec3f {
   var P = array<vec3f, 16>(vec3f(.50, .50, .49), vec3f(.36, .37, .38), vec3f(.09, .095, .10), vec3f(.018, .018, .02), vec3f(.03, .05, .14), vec3f(.30, .03, .035),
     vec3f(.38, .33, .24), vec3f(.03, .09, .06), vec3f(.16, .09, .05), vec3f(.11, .05, .035), vec3f(.14, .19, .24), vec3f(.08, .16, .30),
@@ -442,6 +483,11 @@ fn pal(i: f32) -> vec3f {
     case 13 { alb = vec3f(.25, .26, .27); gl = .95; snowK = .3; }
     case 14 { alb = vec3f(.50, .36, .03) * (.7 + .4 * wA.b); gl = .35; }
     default { alb = vec3f(.04, .13, .06) * (.65 + .5 * wA.b); gl = .3; }
+  }
+  // the brick and panel houses (a building's tex scale is its bay width; not the low shed, not the glass towers)
+  if ((mat == 1 || mat == 2) && i.m.z > 2.85 && i.m.z < 3.45 && sd < 5. && !flt && !(mat == 1 && i.m.z > 3.3)) {
+    let fx = fract(i.op.x / i.m.z);
+    alb = facade(alb, wu, fw, mat == 1, i.m.z, sd, abs(on.x) > .9 && min(fx, 1. - fx) * i.m.z < .05, wA.b);
   }
   // thin, patchy November snow on whatever faces the sky
   let sn = snowK * ss(.62, .9, n0.y) * ss(.47, .6, cov) * f32(!inroom(i.wp));
@@ -670,6 +716,28 @@ fn spot(o: vec3f, d: vec3f, b: vec3f, tm: f32, k: f32) -> f32 { let pl = b - o; 
     let I = mix(1.3 / (.7 + dot(h - lp, h - lp)), .8 / (.5 + dot(h - tp, h - tp)), tv);
     c = alb * lc * I * on + em;
     if (ty == 1) { c = alb * (Lo.d * .25 + FCOL) + lc * scr * on * .5; } else { c += vec3f(.4, .6, 1.) * (scr * on * 3. * (.4 + flick)); }
+    if (ty == 1) {
+      // what a balcony keeps behind its glass: washing on a line, skis stood in a corner, boxes with jars on them
+      let tc = .55 / rd.z;
+      if (tc < tm) {
+        let q = p + rd.xy * tc; let bk = hs(sd * 5.1 + .7); let amb = Lo.d * .25 + FCOL + lc * on * .3; var mk = 0.; var col = vec3f(.3);
+        if (bk < .35) {
+          let yl = sz.y * .5 - .22; let hc = hs(floor(q.x / .38) * 7.7 + sd);
+          mk = step(abs(fract(q.x / .38) - .5), .2 + .2 * hc) * step(q.y, yl) * step(yl - .3 - .45 * hc, q.y) * step(.3, hc) + step(abs(q.y - yl), .008);
+          col = .12 + .3 * hue(hc);
+        } else if (bk < .55) {
+          let sx = sign(h2 - .5) * (sz.x * .5 - .3); let k = (q.y + sz.y * .5) * .1 * sign(h2 - .5);
+          mk = (step(abs(q.x - sx + k), .022) + step(abs(q.x - sx - .08 + k), .022)) * step(q.y, sz.y * .5 - .05);
+          col = select(vec3f(.4, .06, .05), vec3f(.08, .14, .4), h3 > .5);
+        } else if (bk < .75) {
+          let bx = sz.x * (h5 - .5) * .5;
+          mk = rect(q, vec2f(bx, -sz.y * .5 + .18), vec2f(.28, .2)) + rect(q, vec2f(bx + .06, -sz.y * .5 + .5), vec2f(.2, .12));
+          for (var j = 0; j < 4; j++) { mk += rect(q, vec2f(bx - .18 + f32(j) * .12, -sz.y * .5 + .7), vec2f(.04, .08)); }
+          col = vec3f(.26, .19, .11);
+        }
+        c = mix(c, col * amb, sat(mk));
+      }
+    }
     if (ty == 0) {
       // the blue flames of the gas, and their light on the wall behind
       let fk = .75 + .25 * sin(t * 37. + sd * 9.) * sin(t * 23.);
@@ -743,9 +811,44 @@ fn spot(o: vec3f, d: vec3f, b: vec3f, tm: f32, k: f32) -> f32 { let pl = b - o; 
     let fold = mix(.5, .5 + .5 * sin(p.x * (34. + 20. * h2) + 2. * sin(p.y * 2.3 + h1 * 9.)), sat(1. - aa * 30.));
     let cv = select(select(0., .2 + .45 * h4, h5 > .6), 1., h5 > .85);
     let dr = step(sz.x * .5 * (1. - cv), abs(p.x) + 1e-4) * f32(cv > 0.) * f32(kd != 2);
-    let net = f32(h5 > .25) * (.36 + .26 * fold) * (1. - dr) * select(1., step(p.y, -.05), kd == 2);
+    let bl = hs(sd * 29.1 + 7.7); let bld = f32(bl < .2);
+    let net = f32(h5 > .25) * (.36 + .26 * fold) * (1. - dr) * select(1., step(p.y, -.05), kd == 2) * (1. - bld);
     c = mix(c, vec3f(.8) * (lc * .22 * on * (1. - tv * .6) + Lo.d * .3 + FCOL * .7), net);
-    c = mix(c, (.18 + .4 * hue(h1 + .3)) * (.55 + .45 * fold) * (lc * .2 * on + Lo.d * .25 + FCOL * .5), dr);
+    c = mix(c, (.18 + .4 * hue(h1 + .3)) * (.55 + .45 * fold) * (lc * .2 * on + Lo.d * .25 + FCOL * .5), dr * (1. - bld));
+    // blinds in some windows instead: slats across, a roller pulled part of the way down, or strips hanging down
+    let lit = lc * .24 * on * (1. - tv * .6) + Lo.d * .3 + FCOL * .7;
+    if (bl < .08) {
+      let sl = mix(.25, ss(.32, .48, abs(fract(p.y * 15. + .25) - .5)), pat);
+      c = mix(c, select(vec3f(.78, .77, .74), vec3f(.58, .47, .34), h7 > .7) * lit * 1.1, .92 - .7 * sl * on);
+    } else if (bl < .15) {
+      let hr = sz.y * .5 - sz.y * (.2 + .65 * h8);
+      c = mix(c, (.25 + .5 * hue(h6 + .1)) * (lc * .4 * on + Lo.d * .3 + FCOL * .6), step(hr, p.y) * .97);
+      c = mix(c, vec3f(.05), step(abs(p.y - hr), .015));
+    } else if (bl < .2) {
+      let st = mix(.5, ss(.36, .48, abs(fract(p.x * 8.) - .5)), pat);
+      c = mix(c, vec3f(.7, .68, .62) * lit * (.85 + .3 * st), .9 - .45 * st * on * step(.5, h6));
+    }
+    // and the things people put up for the New Year: paper snowflakes stuck on the glass, a star of lights hanging in
+    // it, a curtain of little lights down it
+    let dk = hs(sd * 61.3 + 2.9);
+    if (dk < .07) {
+      var sf = 0.;
+      for (var j = 0; j < 5; j++) {
+        let fj = f32(j); let q = p - vec2f((hs(sd * 3.1 + fj) - .5) * sz.x * .8, (hs(sd * 5.7 + fj * 1.3) - .5) * sz.y * .75); let R = .06 + .06 * hs(sd * 9.3 + fj);
+        let r = length(q); let th = atan2(q.y, q.x);
+        sf = max(sf, step(r, R * (.35 + .65 * pow(abs(cos(3. * th)), 8.))) * (1. - step(abs(r - R * .45), R * .06)));
+      }
+      c = mix(c, vec3f(.85, .86, .88) * (lc * .3 * on + Lo.d * .3 + FCOL * .7), sf * sat(1. - aa * 12.));
+    } else if (dk < .1) {
+      let q = p - vec2f(sz.x * (h2 - .5) * .4, sz.y * .5 - .38); let r = length(q); let th = atan2(q.x, q.y);
+      let star = step(r, .17 * (.5 + .5 * pow(abs(cos(2.5 * th)), 3.))); let tw = .85 + .15 * sin(t * 1.7 + sd * 30.);
+      c = mix(c, vec3f(2.4, 1.7, .8) * tw, star) + vec3f(1.2, .8, .35) * exp(-r * r * 40.) * .6 * tw;
+      c = mix(c, vec3f(.1), step(abs(q.x), .006) * step(.12, q.y));
+    } else if (dk < .125) {
+      let gq = vec2f(p.x / .11, p.y / .085 + .35 * sin(p.x * 9.)); let f = (fract(gq) - .5) * vec2f(.11, .085); let id = floor(gq);
+      let tw = .55 + .45 * sin(t * 2.2 + hs(id.x * 7.1 + id.y * 13.3 + sd) * 40.);
+      c += vec3f(2., 1.45, .7) * (exp(-dot(f, f) * 30000.) * 3. * tw + .04) * step(abs(p.x), sz.x * .5 - .06) * step(abs(p.y), sz.y * .5 - .06);
+    }
   }
   if (fl == 5) {
     // a garland round the window: bulbs along the top and down the sides, their colours stepping round
@@ -758,7 +861,12 @@ fn spot(o: vec3f, d: vec3f, b: vec3f, tm: f32, k: f32) -> f32 { let pl = b - o; 
   // --- glass over it all: the haze and the lamps mirrored, grime
   let fres = .04 + .96 * pow(1. - sat(dot(-rw, n)), 5.);
   c = c * (1. - fres) * (.72 + .28 * dt.a) + fogc(reflect(rw, n)) * 1.5 * fres + Lo.s * 2.;
-  let fa = select(vec3f(.40, .40, .38), vec3f(.10, .06, .04), h4 > .7 && ty == 0) * (.7 + .4 * dt.b);
+  // the frames: white plastic most, old wood painted brown, dark graphite, laminate like oak; on the balconies white,
+  // bare aluminium, yellowed paint, dark wood
+  var fa = vec3f(.40, .40, .38);
+  if (ty == 0) { if (h4 > .7) { fa = vec3f(.10, .06, .04); } else if (h4 < .1) { fa = vec3f(.05, .05, .055); } else if (h4 < .2) { fa = vec3f(.26, .17, .09); } }
+  if (ty == 1) { let fk = hs(sd * 3.7 + .9); if (fk < .25) { fa = vec3f(.26, .27, .29); } else if (fk < .45) { fa = vec3f(.34, .31, .24); } else if (fk < .55) { fa = vec3f(.12, .07, .04); } }
+  fa *= .7 + .4 * dt.b;
   c = mix(c, fa * (Lo.d + FCOL * .9), fm);
   return fin(fog(c, i.wp));
 }

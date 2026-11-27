@@ -57,6 +57,14 @@ const BLD = [
   const T = BT[t], L = T.front.length * sec * T.bw, D = T.side.length * T.bw, [cx, cz] = rotY(-L / 2, -D / 2, yaw), fh = T.fh || FH;
   return { x: x + cx, z: z + cz, yaw, t, fl, sec, pal, sd, T, L, D, fh, H: T.base + fl * fh + T.top, cx: x, cz: z };
 });
+// every house its own address plate: [street, number, style] (the low sheds have none). Styles: 0 blue enamel, 1 a white
+// box lit from inside, 2 dark green enamel, 3 dark wood with gilt letters for the old quarter; the towers' lit
+const STREETS_N = ['ул. Садовая', 'ул. Ленина', 'ул. Мира', 'ул. Школьная', 'пр. Строителей', 'ул. Лесная', 'ул. Гагарина', 'ул. Речная'];
+const HNUM = (() => { const n = [3, 7, 12, 1, 15, 4, 9, 2]; return BLD.map((b, i) => {
+  if (b.t === 2) return null;
+  const st = b.t === 3 ? 7 : b.t === 6 || (b.cz > 300 && b.t !== 3) ? 6 : i * 5 % 6, k = (n[st] += 1 + (i % 3 === 0)), kor = b.t === 6 && i % 2 ? 'к' + (1 + i % 3) : '';
+  return [STREETS_N[st], k + kor, b.t === 3 ? 3 : b.t === 6 || b.fl >= 9 ? 1 : ihash(i, 5, 9) < 0.5 ? 0 : 2];
+}); })();
 // people standing about: the neck's height (+ 10 for the pair of talkers), then each mouth (x, y, z, heading off the figure's)
 const PPL = { standing: [1.55, [0, 1.6, 0.25, 0]], walker: [1.54, [0, 1.6, 0.24, 0]], walkerW: [1.55, [0, 1.61, 0.24, 0]], smoker: [1.57, [0, 1.625, 0.19, 0]],
   girl: [1.48, [0, 1.53, 0.17, 0]], trucker: [1.58, [0, 1.64, 0.18, 0]], bouncer: [1.69, [0, 1.745, 0.14, 0]], seated: [1.29, [0, 1.34, 0.07, 0]], talkers: [11.5, [0, 1.64, -0.34, 0], [0, 1.54, 0.34, PI]] };
@@ -942,6 +950,8 @@ function makeWorld() {
   districts({ solid, reg, lod, wins, winB, made, decals, glare, steam, snd, boxes, rects, grassY, thaw, bare, paper });
   // --- the snow heaped up round the town, the new places, the far corners (extras.js)
   extras({ solid, reg, lod, wins, winB, made, decals, glare, steam, snd, boxes, rects, grassY, thaw, bare, paper, has: (n) => n in id });
+  // --- each house its own front gardens, shell garages, icicles on the eaves (yards.js)
+  gardens({ solid, reg, glare, boxes, grassY });
   // --- what moves about on its own: the traffic, people going from door to door, the dogs (life.js)
   life({ solid, reg, glare, steam, snd, boxes, grassY, decals, wins, has: (n) => n in id });
   // --- footprints in the snow along every way somebody walks or something runs: the walkers going to and fro, the
