@@ -15,7 +15,9 @@ const VOL = 0.8; // master level
 function mkSound(ac) {
   const sr = ac.sampleRate;
   // node of class C with options o, connected to every node / param in `to`; sources start at once
-  const N = (C, o, ...to) => { const n = new C(ac, o); for (const d of to) n.connect(d); if (n.start) n.start(); return n; };
+  // (while a placed sound is being woken up, every node made goes on its list, to be stopped when it is put to sleep)
+  let made = null;
+  const N = (C, o, ...to) => { const n = new C(ac, o); for (const d of to) n.connect(d); if (n.start) n.start(); if (made) made.push(n); return n; };
   const G = (gain, ...to) => N(GainNode, { gain }, ...to);
   const BQ = (type, frequency, Q, ...to) => N(BiquadFilterNode, { type, frequency, Q }, ...to);
   const OSC = (type, frequency, ...to) => N(OscillatorNode, { type, frequency }, ...to);
@@ -71,9 +73,21 @@ function mkSound(ac) {
   // a short voice: oscillator of type `ty` at f through `to`, enveloped, stopping by itself
   const tone = (ty, f, t, a, v, d, to, f2) => { const g = G(0, to), o = N(OscillatorNode, { type: ty, frequency: f }, g); if (f2) o.frequency.exponentialRampToValueAtTime(f2, t + a + d); env(g.gain, t, a, v, d); o.stop(t + a + d + 0.05); return o; };
   const burst = (f, q, t, v, d, to, type = 'bandpass') => { const g = G(0, to), s = N(AudioBufferSourceNode, { buffer: nw, playbackRate: 1 }, BQ(type, f, q, g)); s.stop(t + d + 0.05); env(g.gain, t, 0.002, v, d); };
-  // the sounds of the world (Wd.snd: kind, x, y, z, a walker, which television), then those riding with an actor (ASND)
+  // the sounds of the world (Wd.snd: kind, x, y, z, a walker, which television), then those riding with an actor (ASND).
+  // There are some two hundred of them; were all their voices running at once, the audio thread would have no time left
+  // and the sound would break up. So each one's nodes are made only when it comes within hearing (wake) and stopped
+  // and let go when it goes out of it (sleep).
   const S = Wd.snd.concat(ASND.map(([kind, a]) => [kind, 0, 0, 0, 0, -1, a])).map(([kind, x, y, z, w, tv = -1, a = 0], i) => {
-    const [R, far, wv] = KIND[kind], p = IN.includes(kind) ? pan(room) : pan(glass, G(wv, wet)), lvl = G(0, p), o = { kind, x, y, z, w, tv, a, R, far, p, lvl, next: 0, step: 0, seed: i * 7.31 + 1, on: 0, px: 0, pz: 0, v: 0 };
+    const [R, far, wv] = KIND[kind];
+    return { kind, x, y, z, w, tv, a, R, far, wv, i, nodes: null, next: 0, step: 0, seed: i * 7.31 + 1, on: 0, px: 0, pz: 0, v: 0 };
+  });
+  const sleep = (o, t) => {
+    const L = o.nodes; o.nodes = null; o.next = 0; o.lvl.gain.setTargetAtTime(0, t, 0.03);
+    setTimeout(() => { for (const n of L) { try { if (n.stop) n.stop(); } catch (e) { /* already stopped */ } n.disconnect(); } }, 250);
+  };
+  const wake = (o) => {
+    made = [];
+    const { kind, i } = o, p = (o.p = IN.includes(kind) ? pan(room) : pan(glass, G(o.wv, wet))), lvl = (o.lvl = G(0, p));
     if (kind === 'music') {
       // inside a closed car: only the bass and the thump come through
       o.f = BQ('lowpass', 420, 1.2, lvl); o.bpm = i & 1 ? 100 : 92; o.key = i & 1 ? 45 : 43;
@@ -140,8 +154,8 @@ function mkSound(ac) {
       // a man's voice through two formants, slurring from note to note
       o.vg = G(0, lvl); o.vo = OSC('sawtooth', 110, (o.f1 = BQ('bandpass', 600, 5, o.vg)), (o.f2 = BQ('bandpass', 1100, 7, o.vg)));
     }
-    return o;
-  });
+    o.nodes = made; made = null;
+  };
   // whistled phrases: a pentatonic walk, the same few motifs coming back
   const PENTA = [0, 2, 4, 7, 9, 12, 14, 16];
   let dogT = ac.currentTime + 8, forT = ac.currentTime + 5;
@@ -210,6 +224,9 @@ function mkSound(ac) {
         o.v = mix(o.v, min(hypot(nx - o.px, nz - o.pz) / 0.1, 30), 0.3); o.px = nx; o.pz = nz; o.x = nx; o.y = ACT[k + 1] + 1; o.z = nz;
       }
       const dx = o.x - cx, dy = o.y - cy, dz = o.z - cz, d = hypot(dx, dy, dz), lv = gate / (1 + (d / o.R) ** 2), near = d < o.far && gate > 0;
+      // asleep until within hearing, put to sleep a little beyond it (so one standing on the edge does not flip it)
+      if (!o.nodes) { if (!near) continue; wake(o); }
+      else if (!gate || d > o.far * 1.15) { sleep(o, t); continue; }
       o.lvl.gain.setTargetAtTime(near ? lv : 0, t, 0.3); o.p.pan.setTargetAtTime(side(dx, dz) * min(1, d / 3), t, 0.2);
       if (!near) { o.next = 0; continue; }
       if (o.next < t) o.next = t;
@@ -432,7 +449,7 @@ function mkSound(ac) {
     }
     // dogs: now and then one howls or barks, and another may answer
     if (t > dogT) {
-      const dogs = S.filter((o) => (o.kind === 'dog' || o.kind === 'bark') && hypot(o.x - cx, o.z - cz) < o.far);
+      const dogs = S.filter((o) => (o.kind === 'dog' || o.kind === 'bark') && o.nodes && hypot(o.x - cx, o.z - cz) < o.far);
       if (dogs.length) {
         const fire = (o, a) => {
           if (rnd() < 0.55) {
