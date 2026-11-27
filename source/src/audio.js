@@ -34,11 +34,14 @@ function mkSound(ac) {
   const out = OUT = G(0, lim), pane = G(1, out), glass = BQ('lowpass', 16000, 0.5, pane), wet = N(ConvolverNode, { buffer: ir }, G(0.5, glass));
   const src = (buffer, playbackRate, ...to) => N(AudioBufferSourceNode, { buffer, loop: true, playbackRate }, ...to);
   // wind: a broad band that opens up with the gust, a low push under it, a thin whistle on top
-  const wind = G(0, glass), windF = BQ('bandpass', 400, 0.6, wind), low = G(0.09, glass), whis = G(0, glass), whisF = BQ('bandpass', 1100, 24, whis);
+  // (the wind, its whistle and the blizzard's moan go through one soft lowpass, closed down in a blizzard so the storm
+  // is a muffled roar round the house, not a hiss in the ears)
+  const storm = BQ('lowpass', 6000, 0.5, glass);
+  const wind = G(0, storm), windF = BQ('bandpass', 400, 0.6, wind), low = G(0.09, glass), whis = G(0, storm), whisF = BQ('bandpass', 1100, 24, whis);
   src(nw, 1, windF, whisF); src(nb, 1, BQ('lowpass', 170, 0.7, low)); lfo(0.07, 0.05, low.gain); lfo(0.19, 0.25, G(60, whisF.frequency));
   // the town: far traffic and machinery, too low to place
   // a blizzard moans round the corners
-  const howl = G(0, glass), howlF = BQ('bandpass', 380, 3, howl); src(nb, 1.9, howlF); lfo(0.11, 120, howlF.frequency);
+  const howl = G(0, storm), howlF = BQ('bandpass', 360, 1.6, howl); src(nb, 1.9, howlF); lfo(0.11, 120, howlF.frequency);
   const hum = G(0.2, glass); src(nb, 0.61, BQ('lowpass', 75, 0.7, hum)); lfo(0.031, 0.05, hum.gain);
   // the highway: each slot a band of tyre noise and an engine that only the big ones make heard
   const cars = Array.from({ length: NRC }, () => { const p = pan(glass), g = G(0, p), f = BQ('bandpass', 600, 0.8, g), eg = G(0, p), eo = OSC('sawtooth', 50, BQ('lowpass', 180, 1, eg)); return { p, g, f, eg, eo }; });
@@ -175,10 +178,12 @@ function mkSound(ac) {
     const gu = F[GUST], inr = F[INR], cx = F[CX], cy = F[CY], cz = F[CZ], rx = cos(F[YAW]), rz = sin(F[YAW]);
     const side = (dx, dz) => clamp((dx * rx + dz * rz) / (hypot(dx, dz) + 1e-3), -1, 1);
     glass.frequency.setTargetAtTime(mix(16000, 420, inr), t, 0.12); room.frequency.setTargetAtTime(mix(500, 16000, inr), t, 0.12); pane.gain.setTargetAtTime(mix(1, 0.6, inr), t, 0.12);
-    // a blizzard is heard a third quieter than the wind would make it (bq): the gale, the whistle and the moan
-    const bq = 1 - F[BLZ] / 3;
-    wind.gain.setTargetAtTime((0.1 + 0.8 * gu * gu) * bq, t, 0.4); windF.frequency.setTargetAtTime(240 + 760 * gu, t, 0.5);
-    whis.gain.setTargetAtTime(0.5 * sstep(0.5, 0.95, gu) * bq, t, 0.3); howl.gain.setTargetAtTime(1.4 / 1.5 * F[BLZ], t, 0.8); whisF.frequency.setTargetAtTime(880 + 520 * gu, t, 0.5);
+    // a blizzard is heard soft: the gale at under a third of what the wind would make it (bq), its gusts swelling slowly
+    // instead of striking, its band kept low, the thin whistle all but gone, the moan low and broad, all of it muffled
+    const bl = F[BLZ], bq = 1 - 0.72 * bl;
+    storm.frequency.setTargetAtTime(mix(6000, 1300, bl), t, 0.8);
+    wind.gain.setTargetAtTime((0.1 + 0.8 * gu * gu) * bq, t, 0.4 + 0.9 * bl); windF.frequency.setTargetAtTime(240 + 760 * gu * (1 - 0.5 * bl), t, 0.5 + 0.5 * bl);
+    whis.gain.setTargetAtTime(0.5 * sstep(0.5, 0.95, gu) * (1 - 0.85 * bl), t, 0.3 + 0.6 * bl); howl.gain.setTargetAtTime(0.35 * bl, t, 0.8); whisF.frequency.setTargetAtTime(880 + 520 * gu, t, 0.5);
     cars.forEach((c, k) => {
       const o = RC + k * 4, dz = ROADZ + 1.8 * F[o + 1] - cz, dx = F[o] - cx, d = hypot(dx, dz), on = F[o + 2], big = F[o + 3] > 4 ? 1 : 0, heavy = F[o + 3] === 5 || F[o + 3] === 6 || F[o + 3] === 8 || F[o + 3] > 9;
       c.g.gain.setTargetAtTime(on * (big ? 34 : 22) / (40 + d), t, 0.3); c.f.frequency.setTargetAtTime((big ? 220 : 350) + 9e4 / (d + 60), t, 0.3); c.p.pan.setTargetAtTime(side(dx, dz), t, 0.2);
