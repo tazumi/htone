@@ -402,7 +402,8 @@ function render() {
     m[o] = c[0] * f * s; m[o + 1] = c[1] * f * s; m[o + 2] = c[2] * f * s;
   }
   // the watchman's fire breathes and flickers
-  { const o = U_LAMP + FIREL * 8 + 4, c = LAMPS[FIREL].c, t = F[TIME], f = 0.72 + 0.18 * sin(t * 2.3) * sin(t * 3.7) + 0.16 * fract(sin(floor(t * 14) * 78.2) * 43758.5); m[o] = c[0] * f; m[o + 1] = c[1] * f; m[o + 2] = c[2] * f; }
+  // (and every other fire: the travellers' in the forest, the grill at the party, each on its own beat)
+  for (let j = 0; j < FIRES.length; j++) { const i = FIRES[j], o = U_LAMP + i * 8 + 4, c = LAMPS[i].c, t = F[TIME] + j * 17.3, f = 0.72 + 0.18 * sin(t * 2.3) * sin(t * 3.7) + 0.16 * fract(sin(floor(t * 14) * 78.2) * 43758.5); m[o] = c[0] * f; m[o + 1] = c[1] * f; m[o + 2] = c[2] * f; }
   // the club's light over its door goes round the colours on the beat
   { const o = U_LAMP + CLUBL * 8 + 4, t = F[TIME], b = 0.35 + 0.65 * (fract(t * 2.13) < 0.5 ? 1 : 0); for (let j = 0; j < 3; j++) m[o + j] = 9 * b * (0.5 + 0.5 * cos(TAU * (t * 0.23 + j / 3))); }
   Q.writeBuffer(ubo, 0, UB);

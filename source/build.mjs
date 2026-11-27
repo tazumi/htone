@@ -12,7 +12,7 @@ import LANG from './lang.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 // concatenation order matters: the shaders are built from constants of the world layout
-const FILES = ['quality.js', 'math.js', 'props2.js', 'props3.js', 'props4.js', 'props5.js', 'props6.js', 'props7.js', 'props8.js', 'props9.js', 'world.js', 'town.js', 'districts.js', 'extras.js', 'life.js', 'shaders.js', 'atlas.js', 'main.js', 'audio.js'];
+const FILES = ['quality.js', 'math.js', 'props2.js', 'props3.js', 'props4.js', 'props5.js', 'props6.js', 'props7.js', 'props8.js', 'props9.js', 'props9b.js', 'world.js', 'town.js', 'districts.js', 'extras.js', 'life.js', 'shaders.js', 'atlas.js', 'main.js', 'audio.js'];
 const dev = process.argv.includes('--dev'), readable = dev || process.argv.includes('--readable');
 if (dev) FILES.push('dev.js');
 // the dev page is one file, so it gets one language

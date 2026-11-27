@@ -106,7 +106,7 @@ const PRINK = [-112, 393], RINKM = [[-8, -10.8, 0], [8, 10.8, PI]], PSLIDE = [-8
 NOFOREST.push([-346, -268, -168, -194]);
 for (const [lx, lz, a] of RINKM) { const [dx, dz] = rotY(0, 1.6, a); LAMPS.push({ x: PRINK[0] + lx + dx, y: 10.9, z: PRINK[1] + lz + dz, r: 30, c: [150, 166, 196], t: 99 }); }
 LAMPS.push({ x: PRINK[0] + 15.3, y: 7.3, z: PRINK[1] - 7.8, r: 26, c: [120, 133, 157], t: 99 });
-const FIREL = LAMPS.length; LAMPS.push({ x: FIRE[0], y: RAILY + 1.25, z: FIRE[1], r: 9, c: [13, 5.2, 1.4], t: -1, nb: 1 });
+const FIREL = LAMPS.length; LAMPS.push({ x: FIRE[0], y: RAILY + 1.25, z: FIRE[1], r: 9, c: [13, 5.2, 1.4], t: -1, nb: 1 }); FIRES.push(FIREL);
 LAMPS.push({ x: -246.5, y: RAILY + 10.8, z: -212.6, r: 30, c: [150, 160, 180], t: 99 }); // the works' floodlight over its gate
 LAMPS.push({ x: -205, y: RAILY + 2.9, z: -229.7, r: 9, c: [10, 9, 7], t: -1 }); // and the bulb over the hangar's door
 { const [x, z] = loc(KIOSK[0], KIOSK[1], KIOSK[2], -0.5, 1.7); LAMPS.push({ x, y: 2.3, z, r: 9, c: [9, 8.5, 7.5], t: -1, nb: 1 }); }

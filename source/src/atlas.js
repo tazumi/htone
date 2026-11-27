@@ -484,6 +484,32 @@ function makeAtlas() {
     for (let k = 0; k < 12; k++) { c.save(); c.rotate(k * PI / 6); c.fillStyle = '#222'; c.fillRect(-2, -54, 4, k % 3 ? 8 : 14); c.restore(); }
     c.lineCap = 'round'; c.lineWidth = 6; c.beginPath(); c.moveTo(0, 0); c.lineTo(cos(-2.2) * 30, sin(-2.2) * 30); c.stroke(); c.lineWidth = 4; c.beginPath(); c.moveTo(0, 0); c.lineTo(cos(-0.6) * 46, sin(-0.6) * 46); c.stroke();
   });
+  // ---- the new places: the house of culture and its posters, the market, the coffee van, the map of the town, the cottage
+  //      settlement's sign, the track a snowmobile leaves
+  sign('dkSign', 1024, 96, '#e8e2d0', '#5a3a1a', 'ДОМ КУЛЬТУРЫ «ЭНЕРГЕТИК»', FN);
+  const AFI = [['НОВОГОДНИЙ', 'КОНЦЕРТ', '29 декабря · 18:00', ['#1a2a6a', '#3a6ad0'], '#ffd040'], ['СПЕКТАКЛЬ', '«МОРОЗКО»', 'для детей · сб, вс 12:00', ['#5a1020', '#c03040'], '#fff0c0'],
+    ['ДИСКОТЕКА', '80-х', 'пятница · 20:00', ['#200830', '#a020c0'], '#40f0ff'], ['ХОР', 'ВЕТЕРАНОВ', 'вход свободный', ['#103a20', '#2a8a4a'], '#ffffff']];
+  AFI.forEach(([a, b, d, [g0, g1], fg], i) => cell('afisha' + i, 192, 272, (w, h) => {
+    const g = c.createLinearGradient(0, 0, 0, h); g.addColorStop(0, g1); g.addColorStop(1, g0); c.fillStyle = g; c.fillRect(0, 0, w, h);
+    c.fillStyle = 'rgba(255,255,255,.15)'; for (let k = 0; k < 7; k++) { c.beginPath(); c.arc(rr(0, w), rr(60, 170), rr(10, 40), 0, TAU); c.fill(); }
+    c.fillStyle = fg; c.textAlign = 'center'; fit(a, FB, 30, w - 16); c.fillText(a, w / 2, 48); fit(b, FB, 38, w - 16); c.fillText(b, w / 2, 96);
+    c.fillStyle = '#fff'; fit(d, FN, 16, w - 16, 'bold'); c.fillText(d, w / 2, h - 50); c.font = `12px ${FN}`; c.fillText('ДК «ЭНЕРГЕТИК»', w / 2, h - 22);
+  }));
+  cell('marketSign', 512, 96, (w, h) => neon('ЯРМАРКА', [1, 0.75, 0.3], 76, w, h));
+  sign('coffeeVan', 256, 64, '#3a1c10', '#ffe0b0', 'КОФЕ · ЧАЙ · ГЛИНТВЕЙН', FN);
+  sign('settleSign', 512, 128, '#2a3a2a', '#f0e8d0', 'КП «ЛЕСНАЯ ПОЛЯНА»', FN);
+  cell('cityMapImg', 192, 256, (w, h) => {
+    c.fillStyle = '#e8ecef'; c.fillRect(0, 0, w, h); c.fillStyle = '#1a3a80'; c.fillRect(0, 0, w, 30); c.fillStyle = '#fff'; c.textAlign = 'center'; c.font = `bold 16px ${FN}`; c.fillText('КАРТА ГОРОДА', w / 2, 21);
+    c.fillStyle = '#9ac0e0'; c.fillRect(0, 150, w, 14); c.fillStyle = '#c8dcc0'; c.beginPath(); c.ellipse(70, 210, 40, 26, 0, 0, TAU); c.fill(); c.fillStyle = '#9ac0e0'; c.beginPath(); c.ellipse(64, 212, 16, 10, 0, 0, TAU); c.fill();
+    c.strokeStyle = '#f0c040'; c.lineWidth = 6; c.beginPath(); c.moveTo(0, 60); c.lineTo(w, 60); c.moveTo(140, 30); c.lineTo(140, h); c.stroke();
+    c.fillStyle = '#c0b8a8'; for (let k = 0; k < 22; k++) c.fillRect(rr(6, w - 20), rr(70, 140), rr(8, 18), rr(5, 12));
+    c.fillStyle = '#d02020'; c.beginPath(); c.arc(150, 100, 6, 0, TAU); c.fill(); c.fillStyle = '#222'; c.font = `bold 11px ${FN}`; c.fillText('ВЫ ЗДЕСЬ', 150, 120);
+  });
+  cell('sledTrack', 96, 256, (w, h) => {
+    c.shadowColor = 'rgba(0,0,0,.9)'; c.shadowBlur = 3; c.fillStyle = 'rgba(0,0,0,.8)';
+    for (let y = 0; y < h; y += 10) c.fillRect(30, y, 36, 5);
+    for (const x of [6, 82]) c.fillRect(x, 0, 8, h);
+  });
   pack();
   return { cv, R };
 }

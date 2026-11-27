@@ -432,6 +432,7 @@ fn pal(i: f32) -> vec3f {
       else if (sd < -1.5) { emi = vec3f(.05, .045, .04); }
       else if (sd < -.5) { emi = vec3f(14., 6.6, 1.9); }
       // the lines of light on the glass towers (a building's tex scale is its bay width): cold white, slowly breathing
+      else if (i.m.z > 4.5) { emi = vec3f(2.6, 1.7, .75); }
       else if (i.m.z > 1.5) { emi = vec3f(1.6, 1.85, 2.4) * (.85 + .15 * sin(g.cam.w * .5 + i.wp.y * .04)); }
       else { let L = g.lamp[u32(sd + .5)]; emi = L.c.rgb * select(.09, 1.1, L.c.w < 0.); }
     }
@@ -1100,6 +1101,8 @@ fn beyond(rd: vec3f, px: f32, cin: vec3f) -> vec3f {
   // the gas under the kettle, while it is on
   if (k == 12) { col *= g.ex2.x; }
   if (k == 13) { col *= faulty(p); }
+  // the hazard lights of a broken-down lorry
+  if (k == 14) { col = vec3f(2.4, 1.2, .2) * step(.5, fract(t * 1.45)); }
   // a garland bulb: its colour steps round four with its neighbours (b.r is its place on the string)
   if (k == 3) { let C = array<vec3f, 4>(vec3f(2., .15, .1), vec3f(.2, 1.6, .25), vec3f(.25, .5, 2.4), vec3f(2., 1.3, .15)); let j = u32(floor(t * 1.3) + b.r * 37.) % 4u; col = C[j] * (.6 + .4 * sin(t * 2.3 + b.r * 40.)) * .5; }
   // the ambulance's blue lights while its event is on, two of them out of step
