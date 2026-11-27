@@ -950,8 +950,8 @@ function makeWorld() {
   districts({ solid, reg, lod, wins, winB, made, decals, glare, steam, snd, boxes, rects, grassY, thaw, bare, paper });
   // --- the snow heaped up round the town, the new places, the far corners (extras.js)
   extras({ solid, reg, lod, wins, winB, made, decals, glare, steam, snd, boxes, rects, grassY, thaw, bare, paper, has: (n) => n in id });
-  // --- each house its own front gardens, shell garages, icicles on the eaves (yards.js)
-  gardens({ solid, reg, glare, boxes, grassY });
+  // --- each house its own front gardens, shell garages, icicles on the eaves; the board of what is new (yards.js)
+  gardens({ solid, reg, glare, boxes, grassY, decals });
   // --- what moves about on its own: the traffic, people going from door to door, the dogs (life.js)
   life({ solid, reg, glare, steam, snd, boxes, grassY, decals, wins, has: (n) => n in id });
   // --- footprints in the snow along every way somebody walks or something runs: the walkers going to and fro, the

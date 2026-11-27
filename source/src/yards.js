@@ -76,6 +76,25 @@ const PROPS10 = {
   },
 };
 
+// the board of what is new, in front of the viewer's window on the corner of the playground: x, z, yaw (its face to
+// +z turned toward the window); a lamp on an arm over it lights the notices (NEWS in news.js)
+const NEWSB = [13.5, 18.5, -0.46];
+{ const [x, z] = loc(NEWSB[0], NEWSB[1], NEWSB[2], 0, 0.62); LAMPS.push({ x, y: 3.02, z, r: 7, c: [5, 3.6, 2], t: -1 }); }
+// the board: posts 3.5 apart, a dark cork panel 3.3 x 1.75 (y 0.7..2.45, face at z 0.02), a plate for its header over
+// it, a little roof, the lamp's arm and shade (the bulb glows: seed -1)
+PROPS10.newsBoard = () => {
+  const m = new Mesh().mat(M_METAL);
+  for (const x of [-1.75, 1.75]) m.box(x - 0.05, 0, -0.05, x + 0.05, 3.05, 0.05, 4, 0.5, 1);
+  m.box(-1.72, 0.66, -0.05, 1.72, 0.7, 0.05); m.box(-1.72, 2.45, -0.05, 1.72, 2.49, 0.05);
+  m.box(-0.85, 2.52, -0.02, 0.85, 2.82, 0.04);
+  m.bar([0, 3.0, -0.25], [0, 3.14, 0.12], 3.9, 0.02); m.bar([0, 3.14, 0.12], [0, 3.0, 0.5], 3.9, 0.02);
+  for (const x of [-1.95, 1.95]) m.tri(m.v(x, 2.99, -0.25), m.v(x, 3.13, 0.12), m.v(x, 2.99, 0.5));
+  m.bar([0, 3.05, 0.1], [0, 3.05, 0.62], 0.03); m.tube([[0, 3.12, 0.62], [0, 2.98, 0.62]], (k) => [0.05, 0.13][k], 10, 1);
+  m.mat(M_LAMP).tube([[0, 3.0, 0.62], [0, 2.97, 0.62]], 0.08, 8, 2);
+  m.mat(M_TINT).box(-1.7, 0.7, -0.03, 1.7, 2.45, 0.02, 0, 0.8, 1);
+  return m;
+};
+
 // the snow lying along the top of a shell garage (its own mesh: palette 16 makes it snow)
 PROPS10.shellSnow = () => {
   const m = new Mesh().mat(M_TINT), N = 12, R = 1.4, H = 1.9, prof = (k) => { const a = k / N * PI; return [R * cos(a) * 1.03, H * sin(a) * 1.03 + 0.02]; };
@@ -84,7 +103,7 @@ PROPS10.shellSnow = () => {
 };
 
 function gardens(o) {
-  const { solid, reg, glare, boxes, grassY } = o;
+  const { solid, reg, glare, boxes, grassY, decals } = o;
   for (const k in PROPS10) reg(k, PROPS10[k]());
   const g0 = (x, z) => max(grassY(x, z), 0), nh = BLD.length;
   // is the ground at x, z free: on a lawn, off every walkway, path and door, clear of what stands about
@@ -125,6 +144,20 @@ function gardens(o) {
       }
     }
   });
+
+  // the board of what is new: the newest notice on top in the middle, the earlier ones round it half covered
+  {
+    const [x, z, a] = NEWSB, y = g0(x, z), at = (u, yy, zz) => { const [wx, wz] = loc(x, z, a, u, zz); return [wx, y + yy, wz]; };
+    solid('newsBoard', x, y, z, a, 8, -1); boxes.push([x - 1.2, z - 1.2, x + 1.2, z + 1.2, 3]);
+    glare.push(...at(0, 2.96, 0.62), 0.35, 3, 2, 1, 0);
+    { const p = at(0, 2.67, 0.05); decals.push(p[0], p[1], p[2], a, 1.6, 0.225, 0, 0, 'newsHead'); }
+    const SLOT = [[0.1, 1.56], [0.62, 1.64], [-0.5, 1.52], [1.15, 1.55], [-1.12, 1.6], [0.2, 1.62]];
+    NEWS.forEach((e, i) => {
+      const age = NEWS.length - 1 - i; if (age >= SLOT.length) return;
+      const [u, yy] = SLOT[age], p = at(u, yy, 0.025 + 0.004 * (SLOT.length - age));
+      decals.push(p[0], p[1], p[2], a, 0.84, 1.05, age ? 0 : 8, 0, 'news' + i);
+    });
+  }
 
   // shell garages in a row behind some of the far houses
   rseed(98);

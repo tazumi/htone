@@ -2,9 +2,9 @@
 // decal atlas: everything with letters or fine print, painted once at load time with Canvas 2D
 // ============================================================================
 // Graffiti and plates by the doors, the intercom panels, shop signs, the goods in the shop windows, notices. Each item
-// is drawn into its own cell of one 2048 x 4096 texture; makeAtlas() returns the canvas and, per name, the cell as
+// is drawn into its own cell of one 2048 x 4608 texture; makeAtlas() returns the canvas and, per name, the cell as
 // [u0, v0, u1, v1]. world.js asks for the cells by name (see DECALS there).
-const ATLAS = 2048, ATLASH = 4096;
+const ATLAS = 2048, ATLASH = 4608;
 function makeAtlas() {
   const cv = document.createElement('canvas'); cv.width = ATLAS; cv.height = ATLASH;
   const c = cv.getContext('2d'), R = {};
@@ -515,6 +515,24 @@ function makeAtlas() {
     c.shadowColor = 'rgba(0,0,0,.9)'; c.shadowBlur = 3; c.fillStyle = 'rgba(0,0,0,.8)';
     for (let y = 0; y < h; y += 10) c.fillRect(30, y, 36, 5);
     for (const x of [6, 82]) c.fillRect(x, 0, 8, h);
+  });
+  // the notices of what is new (NEWS in news.js): a sheet of paper taped up, the older ones yellowed, the date, a title,
+  // a few lines; and the board's own header
+  NEWS.forEach(([date, title, lines], i) => cell('news' + i, 256, 320, (w, h) => {
+    const age = NEWS.length - 1 - i, y0 = 0.94 - 0.05 * min(age, 4);
+    c.fillStyle = rgb(y0, y0 * 0.97, y0 * 0.88); c.fillRect(4, 4, w - 8, h - 8);
+    c.fillStyle = 'rgba(120,100,60,.12)'; for (let k = 0; k < 40; k++) c.fillRect(rr(4, w - 8), rr(4, h - 8), rr(2, 10), rr(1, 3));
+    c.fillStyle = 'rgba(225,225,200,.55)'; c.fillRect(w / 2 - 40, 0, 80, 22);
+    c.textAlign = 'center'; c.fillStyle = '#9a2a1a'; fit('ОБНОВЛЕНИЕ', FB, 18, w - 30); c.fillText('ОБНОВЛЕНИЕ', w / 2, 44);
+    c.fillStyle = '#333'; fit(date, FN, 18, w - 30, 'bold'); c.fillText(date, w / 2, 66);
+    c.fillStyle = '#1a1a2a'; fit(title, FN, 22, w - 26, 'bold'); c.fillText(title, w / 2, 98);
+    c.fillStyle = '#9a2a1a'; c.fillRect(30, 110, w - 60, 2);
+    c.textAlign = 'left'; c.fillStyle = '#222';
+    lines.forEach((ln, k) => { fit(ln, FN, 17, w - 34); c.fillText(ln, 18, 138 + k * 24); });
+  }));
+  cell('newsHead', 512, 72, (w, h) => {
+    c.fillStyle = '#123a5a'; c.fillRect(0, 0, w, h); c.strokeStyle = '#e8e0c8'; c.lineWidth = 4; c.strokeRect(6, 6, w - 12, h - 12);
+    c.fillStyle = '#f4ecd0'; c.textAlign = 'center'; c.textBaseline = 'middle'; fit('ЧТО НОВОГО ВО ДВОРЕ', FB, 40, w - 40); c.fillText('ЧТО НОВОГО ВО ДВОРЕ', w / 2, h / 2 + 2);
   });
   pack();
   return { cv, R, used };
