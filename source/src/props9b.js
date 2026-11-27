@@ -94,10 +94,14 @@ const PROPS9B = {
     const win = [[1, -5, 1.6, 2.6, 2.2], [1, 3, 1.6, 1.2, 2.2], [3, 5, 1.6, 2.6, 2.2], [3, -2, 1.6, 1.2, 2.2], [2, 0, 1.6, 2.4, 2.4]];
     m.mat(M_CONC).box(-4.1, 0, -9.1, 4.1, 0.3, 9.1, 4, 0.55, 1);
     m.mat(M_PANEL); p9walls(m, -4, -9, 4, 9, 0.3, 3.4, win.concat([[0, 0, 1.85, 7.2, 3.0]]), W, 0.1);
-    // the glass gable over the glass wall, the boards everywhere else
-    W.push([0, 4.9, 8.9, 0, 5.2, 2.6]);
-    m.mat(M_PANEL); m.q4([4, 3.4, -9], [0, 6.9, -9], [0, 6.9, -9], [-4, 3.4, -9]); m.tri(m.v(4, 3.4, -9), m.v(-4, 3.4, -9), m.v(0, 6.9, -9));
-    m.mat(M_METAL); m.bar([-4, 3.4, 9.0], [0, 6.9, 9.0], 0.1, 0.1); m.bar([4, 3.4, 9.0], [0, 6.9, 9.0], 0.1, 0.1); m.bar([-2.6, 3.4, 9.0], [2.6, 3.4, 9.0], 0.1, 0.1); m.bar([0, 3.4, 9.0], [0, 6.9, 9.0], 0.06, 0.06);
+    // the gables: the back one closed, the front one round a window over the glass wall (its edges follow the roof's
+    // slope: at y the gable is 4 * (6.9 - y) / 3.5 wide either side)
+    m.mat(M_PANEL); m.tri(m.v(4, 3.4, -9), m.v(-4, 3.4, -9), m.v(0, 6.9, -9));
+    const gx = (y) => 4 * (6.9 - y) / 3.5, Z = 9, ha = 1.5, hb = 3.6, ht = 5.4;
+    m.q4([-4, 3.4, Z], [-ha, 3.4, Z], [-ha, ht, Z], [-gx(ht), ht, Z]); m.q4([ha, 3.4, Z], [4, 3.4, Z], [gx(ht), ht, Z], [ha, ht, Z]);
+    m.q4([-ha, 3.4, Z], [ha, 3.4, Z], [ha, hb, Z], [-ha, hb, Z]); m.tri(m.v(-gx(ht), ht, Z), m.v(gx(ht), ht, Z), m.v(0, 6.9, Z));
+    p3wall(m, -ha, ha, hb, ht, Z, [[-ha + 0.001, hb + 0.001, ha - 0.001, ht - 0.001]], 0.12); W.push([0, (hb + ht) / 2, Z - 0.12, 0, ha * 2, ht - hb]);
+    m.mat(M_METAL); m.bar([-4, 3.4, Z + 0.02], [4, 3.4, Z + 0.02], 0.12, 0.08);
     m.mat(M_DARK); for (const s of [-1, 1]) { m.q4([s * 4.05, 3.38, 9.05], [s * 4.05, 3.38, -9.05], [0, 6.95, -9.05], [0, 6.95, 9.05].map((v) => v), 0.9); }
     m.mat(M_DARK); for (let z = -8.9; z < 9; z += 0.3) for (const s of [-1, 1]) m.box(s * 4 - 0.02 + (s > 0 ? 0 : -0.01), 0.3, z, s * 4 + 0.02, 3.38, z + 0.05, s > 0 ? 1 : 2, 0.8, 1);
     m.mat(M_BARK).box(-4, 0, 9, 4, 0.25, 12, 4, 0.6, 1); // a deck of larch before the glass
@@ -117,7 +121,7 @@ const PROPS9B = {
     m.mat(M_RED); p9gable(m, -6.5, -5, 6.5, 5, 5.6, 4.6, 0.6, 0.2); m.mat(M_TINT); for (const x of [-6.5, 6.5]) p9gableEnd(m, x, -5, 5, 5.6, 4.6);
     // the porch with its own small gable; the turret at the corner with a cone roof
     m.mat(M_TINT).box(-1.0, 0.4, 5, 1.0, 3.2, 6.6, 16, 0.8, 1); m.mat(M_BARK).box(-0.6, 0.4, 6.6, 0.6, 2.6, 6.66, 0, 0.8, 1);
-    m.at(0, 0, 0, PI / 2).mat(M_RED); p9gable(m, 5, -1.2, 6.7, 1.2, 3.2, 1.3, 0.2, 0.15); m.at(0, 0, 0, 0);
+    m.at(0, 0, 0, -PI / 2).mat(M_RED); p9gable(m, 5, -1.2, 6.7, 1.2, 3.2, 1.3, 0.2, 0.15); m.mat(M_TINT); p9gableEnd(m, 6.7, -1.0, 1.0, 3.2, 1.1); m.at(0, 0, 0, 0);
     m.mat(M_TINT); p7ring(m, -6.2, 4.7, [[0.4, 1.5], [7.2, 1.5]], 12, false, false); W.push([-6.2, 6.0, 6.2, 0, 0.8, 1.2]);
     m.mat(M_RED); p7ring(m, -6.2, 4.7, [[7.1, 1.75], [10.6, 0.02]], 12, true, false);
     m.mat(M_BRICK).box(3.2, 8.5, -0.5, 4.0, 11.5, 0.5, 4, 1, 1);
@@ -152,7 +156,13 @@ const PROPS9B = {
     m.mat(M_CONC).box(-4.7, 0, -3.7, 4.7, 0.5, 3.7, 4, 0.55, 1);
     m.mat(M_BARK); p9walls(m, -4.5, -3.5, 4.5, 3.5, 0.5, 3.4, [[0, -2.6, 1.9, 1.1, 1.1], [0, 2.4, 1.9, 1.1, 1.1], [1, 0, 1.9, 1.1, 1.1], [3, -1, 1.9, 1.1, 1.1]], W, rec);
     // the logs: round ends at the corners, a ridge every course
-    for (let y = 0.65; y < 3.4; y += 0.3) { for (const s of [-1, 1]) { m.tube([[-4.75, y, s * 3.6], [4.75, y, s * 3.6]], 0.15, 6, 3); m.tube([[s * 4.6, y + 0.15, -3.75], [s * 4.6, y + 0.15, 3.75]], 0.15, 6, 3); } }
+    // (each course along a wall, broken where a window [along, y0, y1] or the door cuts it)
+    const cut = { z1: [[-2.6, 0.55], [2.4, 0.55], [0, 0.5]], z0: [], x1: [[0, 0.55]], x0: [[-1, 0.55]] }, ys = { '-2.6': [1.3, 2.5], '2.4': [1.3, 2.5], '0': [1.3, 2.5], '-1': [1.3, 2.5] };
+    const course = (a, b, y, holes, P) => { let segs = [[a, b]]; for (const [c, r] of holes) { const yy = c === 0 && holes === cut.z1 && r === 0.5 ? [0.5, 2.7] : ys[String(c)]; if (y + 0.15 < yy[0] || y - 0.15 > yy[1]) continue; segs = segs.flatMap(([p, q]) => [[p, min(q, c - r)], [max(p, c + r), q]].filter(([e, f]) => f - e > 0.1)); } for (const [p, q] of segs) m.tube([P(p), P(q)], 0.15, 6, 3); };
+    for (let y = 0.65; y < 3.4; y += 0.3) {
+      course(-4.75, 4.75, y, cut.z1, (u) => [u, y, 3.6]); course(-4.75, 4.75, y, cut.z0, (u) => [u, y, -3.6]);
+      course(-3.75, 3.75, y + 0.15, cut.x1, (u) => [4.6, y + 0.15, -u]); course(-3.75, 3.75, y + 0.15, cut.x0, (u) => [-4.6, y + 0.15, u]);
+    }
     m.mat(M_DARK); p9gable(m, -4.5, -3.5, 4.5, 3.5, 3.4, 2.4, 0.7, 0.18); m.mat(M_BARK); for (const x of [-4.5, 4.5]) p9gableEnd(m, x, -3.5, 3.5, 3.4, 2.4);
     // the door, the porch roof on two posts, the bench, the stove pipe
     m.mat(M_BARK).box(-0.5, 0.5, 3.5, 0.5, 2.6, 3.58, 16, 0.8, 1); m.box(-1.4, 0.5, 3.5, 1.4, 0.6, 5.2, 4, 0.6, 1);

@@ -204,7 +204,7 @@ function meshBuilding(b, room) {
           const y0 = T.base + f * fh;
           if (k === 'b') {
             // a loggia: the glass set back 1.2 m, the slab's edge, a glass balustrade on a thin rail at the front
-            holes.push([u0 + 0.12, u1 - 0.12, y0, y0 + fh - 0.15, -1.2]); W.push([s, uc, y0 + (fh - 0.15) / 2, -1.2, bw - 0.24, fh - 0.15, 0, 0]);
+            holes.push([u0 + 0.12, u1 - 0.12, y0, y0 + fh - 0.15, 1.2]); W.push([s, uc, y0 + (fh - 0.15) / 2, -1.2, bw - 0.24, fh - 0.15, 0, 0]);
             m.mat(M_LENS).box(u0 + 0.14, y0 + 0.02, -0.06, u1 - 0.14, y0 + 1.05, -0.04, 0, 1, 1); m.mat(M_METAL).box(u0 + 0.12, y0 + 1.05, -0.08, u1 - 0.12, y0 + 1.09, -0.02, 0, 1, 1);
           } else { holes.push([u0 + 0.16, u1 - 0.16, y0 + 0.12, y0 + fh - 0.18, RD]); W.push([s, uc, y0 + 0.12 + (fh - 0.3) / 2, -RD, bw - 0.32, fh - 0.3, 0, 0]); }
         }

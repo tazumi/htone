@@ -175,8 +175,10 @@ function mkSound(ac) {
     const gu = F[GUST], inr = F[INR], cx = F[CX], cy = F[CY], cz = F[CZ], rx = cos(F[YAW]), rz = sin(F[YAW]);
     const side = (dx, dz) => clamp((dx * rx + dz * rz) / (hypot(dx, dz) + 1e-3), -1, 1);
     glass.frequency.setTargetAtTime(mix(16000, 420, inr), t, 0.12); room.frequency.setTargetAtTime(mix(500, 16000, inr), t, 0.12); pane.gain.setTargetAtTime(mix(1, 0.6, inr), t, 0.12);
-    wind.gain.setTargetAtTime(0.1 + 0.8 * gu * gu, t, 0.4); windF.frequency.setTargetAtTime(240 + 760 * gu, t, 0.5);
-    whis.gain.setTargetAtTime(0.5 * sstep(0.5, 0.95, gu), t, 0.3); howl.gain.setTargetAtTime(1.4 * F[BLZ], t, 0.8); whisF.frequency.setTargetAtTime(880 + 520 * gu, t, 0.5);
+    // a blizzard is heard a third quieter than the wind would make it (bq): the gale, the whistle and the moan
+    const bq = 1 - F[BLZ] / 3;
+    wind.gain.setTargetAtTime((0.1 + 0.8 * gu * gu) * bq, t, 0.4); windF.frequency.setTargetAtTime(240 + 760 * gu, t, 0.5);
+    whis.gain.setTargetAtTime(0.5 * sstep(0.5, 0.95, gu) * bq, t, 0.3); howl.gain.setTargetAtTime(1.4 / 1.5 * F[BLZ], t, 0.8); whisF.frequency.setTargetAtTime(880 + 520 * gu, t, 0.5);
     cars.forEach((c, k) => {
       const o = RC + k * 4, dz = ROADZ + 1.8 * F[o + 1] - cz, dx = F[o] - cx, d = hypot(dx, dz), on = F[o + 2], big = F[o + 3] > 4 ? 1 : 0, heavy = F[o + 3] === 5 || F[o + 3] === 6 || F[o + 3] === 8 || F[o + 3] > 9;
       c.g.gain.setTargetAtTime(on * (big ? 34 : 22) / (40 + d), t, 0.3); c.f.frequency.setTargetAtTime((big ? 220 : 350) + 9e4 / (d + 60), t, 0.3); c.p.pan.setTargetAtTime(side(dx, dz), t, 0.2);
