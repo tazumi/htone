@@ -165,7 +165,7 @@ const FLYN = FLY.length / 6, FLYT = 60, LUTN = 1024, flyLUT = new Float32Array(L
 // per-frame float state lives in one preallocated array, so the frame loop allocates no heap numbers
 const F = new Float64Array(128), P6 = new Float64Array(6);
 const CX = 0, CY = 1, CZ = 2, YAW = 3, PIT = 4, FX = 5, FY = 6, FZ = 7, RX = 8, RZ = 9, UX = 10, UY = 11, UZ = 12, VX = 13, VY = 14, VZ = 15, TIME = 16, FLT = 17, LAST = 18, GPU = 19, HUDT = 20, SPL = 21, MX = 22, MY = 23, MZ = 24,
-  BLZ = 82, KET = 83, BAL = 84, TOUR = 85, TOURT = 86, GUST = 25, WX = 26, WZ = 27, PAP = 28, TRX = 29, TRD = 30, TRON = 31, FLK = 32, INR = 33, FRX = 34, FRD = 35, FRON = 36, PLX = 37, PLZ = 38, PLH = 39, PLON = 40, DRF = 41, SNOWD = 42, EVA = 43, EVX = 44, EVS = 45, EVL = 46,
+  BLZ = 82, KET = 83, CALM = 87, FALLT = 88, BAL = 84, TOUR = 85, TOURT = 86, GUST = 25, WX = 26, WZ = 27, PAP = 28, TRX = 29, TRD = 30, TRON = 31, FLK = 32, INR = 33, FRX = 34, FRD = 35, FRON = 36, PLX = 37, PLZ = 38, PLH = 39, PLON = 40, DRF = 41, SNOWD = 42, EVA = 43, EVX = 44, EVS = 45, EVL = 46,
   RC = 48; // RC: NRC x (x, direction, present, kind)
 // aim the camera from P6 = position + look-at point
 function aim() {
@@ -382,7 +382,7 @@ function render() {
   m[U_FWD] = fx; m[U_FWD + 1] = fy; m[U_FWD + 2] = fz; m[U_FWD + 3] = NEAR;
   m[U_MIS] = EXPO; m[U_MIS + 1] = RAYS; m[U_MIS + 2] = det; m[U_MIS + 3] = F[GUST];
   m[U_WIND] = F[WX]; m[U_WIND + 1] = 0; m[U_WIND + 2] = F[WZ]; m[U_WIND + 3] = F[GUST];
-  m[U_PAP] = F[PAP]; m[U_PAP + 1] = F[DRF]; m[U_PAP + 2] = F[SNOWD];
+  m[U_PAP] = F[PAP]; m[U_PAP + 1] = F[DRF]; m[U_PAP + 2] = F[SNOWD]; m[U_PAP + 3] = F[FALLT];
   m[U_EV] = F[EVA]; m[U_EV + 1] = F[EVX]; m[U_EV + 2] = F[EVS]; m[U_EV + 3] = F[EVL];
   m[U_TR] = F[TRX]; m[U_TR + 1] = F[TRD]; m[U_TR + 2] = F[TRON];
   m[U_TR2] = F[FRX]; m[U_TR2 + 1] = F[FRD]; m[U_TR2 + 2] = F[FRON];
@@ -394,7 +394,7 @@ function render() {
   { const o = U_LAMP + FLICK2 * 8 + 4, c = LAMPS[FLICK2].c, f = fract(sin(floor(F[TIME] * 9) * 47.3) * 9631.7) > 0.8 || fract(F[TIME] / 17) > 0.9 ? 0.08 : 1; m[o] = c[0] * f; m[o + 1] = c[1] * f; m[o + 2] = c[2] * f; }
   // the flat's lights as its switches have them, the televisions flickering with their pictures (when on)
   ALAMP.forEach((l, j) => { if (j === 1) return; const o = U_LAMP + (AL0 + j) * 8 + 4, f = FLAT.light[j]; m[o] = l[5][0] * f; m[o + 1] = l[5][1] * f; m[o + 2] = l[5][2] * f; });
-  m[U_EX] = F[KET]; m[U_EX + 1] = F[BLZ]; m[U_EX + 2] = FLAT.tv[1]; m[U_EX + 3] = FLAT.tv[0]; m[U_EX + 4] = FLAT.kettle > 0 ? 1 : 0;
+  m[U_EX] = F[KET]; m[U_EX + 1] = F[BLZ]; m[U_EX + 2] = FLAT.tv[1]; m[U_EX + 3] = FLAT.tv[0]; m[U_EX + 4] = FLAT.kettle > 0 ? 1 : 0; m[U_EX + 5] = F[CALM];
   { const o = U_LAMP + TVL * 8 + 4, c = LAMPS[TVL].c, f = FLAT.tv[0] * (0.55 + 0.45 * fract(sin(floor(F[TIME] * 3) * 127.1) * 43758.5453)); m[o] = c[0] * f; m[o + 1] = c[1] * f; m[o + 2] = c[2] * f; }
   { const o = U_LAMP + TVL2 * 8 + 4, c = LAMPS[TVL2].c, f = FLAT.tv[1] * (0.5 + 0.5 * fract(sin(floor(F[TIME] * 2.3 + 0.5) * 91.7) * 43758.5453)); m[o] = c[0] * f; m[o + 1] = c[1] * f; m[o + 2] = c[2] * f; }
   // the watchman's fire breathes and flickers
@@ -454,13 +454,17 @@ function world(dt) {
   // minute each way), with a light flutter on top when it is strong; the offset it has carried the air drives the snow
   const sw = 0.5 - 0.5 * cos(t * TAU / 150 + 0.4 * sin(t * 0.013)); let g = 0.04 + 0.96 * sw * (0.9 + 0.1 * sin(t * 0.83 + 2 * sin(t * 0.31)));
   // now and then a blizzard: for a minute and a half the wind blows a gale, the snow comes thick and the haze closes in
-  { const c = ((t + 180) % BLZP + BLZP) % BLZP; F[BLZ] = sstep(0, 18, c) * (1 - sstep(68, 96, c)); g = max(g, F[BLZ] * (0.86 + 0.14 * sin(t * 1.7) * sin(t * 0.61))); }
+  // and on the same cycle, well clear of it, a calm: the wind drops away and big soft flakes come down slowly and straight
+  { const c = ((t + 180) % BLZP + BLZP) % BLZP; F[BLZ] = sstep(0, 18, c) * (1 - sstep(68, 96, c)); F[CALM] = sstep(196, 226, c) * (1 - sstep(330, 362, c));
+    g = max(g * (1 - 0.92 * F[CALM]), F[BLZ] * (0.86 + 0.14 * sin(t * 1.7) * sin(t * 0.61))); }
+  // the snow's clock: the flakes sink at half their pace in a calm
+  F[FALLT] += dt * (1 - 0.5 * F[CALM]);
   F[GUST] = g; const ws = 0.8 + 4.2 * g + 7 * F[BLZ]; F[WX] += WDX * ws * dt; F[WZ] += WDZ * ws * dt;
   F[PAP] += (g > 0.4 ? g - 0.4 : 0) * 6 * dt;
   // loose snow runs along the ground in the stronger gusts
   F[DRF] += (g > 0.3 ? g - 0.3 : 0) * 9 * dt;
   // the snowfall: from a few flakes to a thick fall and back, on a slower swell of its own (the share of flakes shown)
-  { const s = 0.5 - 0.5 * cos(t * TAU / 230 + 2.1); F[SNOWD] = max(0.04 + 0.96 * s * s, F[BLZ]); }
+  { const s = 0.5 - 0.5 * cos(t * TAU / 230 + 2.1); F[SNOWD] = max(0.04 + 0.96 * s * s + (0.6 - s * s) * F[CALM], F[BLZ]); }
   // events: the ambulance's lights at a far door (on for a while, off for a while), the level crossing while a train
   // is near it, a salute far away (seconds since it began, -1 when none), a car alarm in the yard
   F[EVA] = fract(t / 260 + 0.3) < 0.45 ? 1 : 0;

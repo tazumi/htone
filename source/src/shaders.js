@@ -994,20 +994,23 @@ fn beyond(rd: vec3f, px: f32, cin: vec3f) -> vec3f {
 }
 // snow: wraps around the camera in a 44 m cube, falls, drifts with the wind; bright where a lamp's cone catches it
 @vertex fn vsSnow(@builtin(vertex_index) vi: u32, @location(0) a: vec4f) -> VO {
-  var o: VO; let q = quad(vi); let t = g.cam.w; let B = 44.;
+  var o: VO; let q = quad(vi); let t = g.cam.w; let B = 44.; let cm = g.ex2.y;
+  // in a calm (ex2.y) the flakes are big soft clumps that rock from side to side as they sink; their clock (pap.w) runs
+  // slower then, so they come down slower without a jump
   let fall = .5 + .55 * a.w;
-  var p = a.xyz * B + g.wind.xyz * (.55 + .5 * a.w) + vec3f(0., 0. - t * fall, 0.) + .3 * vec3f(sin(t * .7 + a.x * 60.), 0., cos(t * .6 + a.z * 70.));
+  let rock = (.3 + .45 * cm) * vec3f(sin(t * .7 + a.x * 60.), 0., cos(t * .6 + a.z * 70.));
+  var p = a.xyz * B + g.wind.xyz * (.55 + .5 * a.w) + vec3f(0., 0. - g.pap.w * fall, 0.) + rock;
   p = g.cam.xyz + (fract((p - g.cam.xyz) / B + .5) - .5) * B;
   let d = length(p - g.cam.xyz);
-  let sz = (.011 + .02 * a.w * a.w) * (1. + .6 * g.ex.y); let px = d * .0011; let s = max(sz, px);
+  let sz = mix((.011 + .02 * a.w * a.w) * (1. + .6 * g.ex.y), .022 + .05 * a.w * a.w, cm); let px = d * .0011; let s = max(sz, px);
   // a short streak along its fall, as a shutter would draw it
   let vel = WDIR * (.8 + 4.2 * g.wind.w + 7. * g.ex.y) - vec3f(0., fall, 0.); let vd = normalize(vel);
   let sdv = normalize(cross(vd, p - g.cam.xyz));
-  let w = p + sdv * (q.x * s) + vd * (q.y * (s + length(vel) * .012));
+  let w = p + sdv * (q.x * s) + vd * (q.y * (s + length(vel) * .012 * (1. - cm)));
   o.cp = g.vp * vec4f(w, 1.); o.uv = q; o.wp = p;
   let room = all(p > vec3f(${APTB.slice(0, 3).map((v) => fl(v - 0.3)).join(',')})) && all(p < vec3f(${APTB.slice(3).map((v) => fl(v + 0.3)).join(',')}));
   let cvr = min(1., sz / px) * ss(0., .05, g.pap.z - hs(a.x * 91.7 + a.z * 13.1 + a.y * 3.3)); let fade = ss(B * .5, B * .34, d) * ss(.25, 1.2, d) * cvr * cvr * ss(.0, .3, p.y) * f32(!room);
-  o.pr = vec4f((glow(p) * .5 + FCOL * 1.1) * fade, d);
+  o.pr = vec4f((glow(p) * .5 + FCOL * 1.1) * fade * (1. - .3 * cm), d);
   if (fade <= 0.) { o.cp = vec4f(0., 0., 2., 1.); }
   return o;
 }
