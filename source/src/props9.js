@@ -97,3 +97,22 @@ Object.assign(PROPS7, {
     return m;
   },
 });
+
+Object.assign(PROPS9, {
+  // a window grille of the ground floor, the sun rising from the sill: W wide, H high, centred on x, from y 0 (the sill)
+  // up, standing 0.06 off the wall at z 0
+  grille(W = 1.55, H = 1.55) {
+    const m = new Mesh().mat(M_METAL), z = 0.06, r = 0.012;
+    m.sweep([[-W / 2, 0, z], [-W / 2, H, z], [W / 2, H, z], [W / 2, 0, z]], 0.025, 0.025, () => [0, 0, 1], true);
+    m.bar([-W / 2, 0, z], [W / 2, 0, z], 0.025, 0.025);
+    const c = [0, 0.02, z], R = H * 0.33;
+    const arc = []; for (let k = 0; k <= 10; k++) { const a = k / 10 * PI; arc.push([cos(a) * R, 0.02 + sin(a) * R, z]); } m.tube(arc, r, 4, 0);
+    for (let k = 1; k < 10; k++) {
+      const a = k / 10 * PI, dx = cos(a), dy = sin(a), tx = dx > 0 ? (W / 2) / dx : dx < 0 ? (-W / 2) / dx : 1e9, ty = (H - 0.02) / dy, t = min(tx, ty);
+      m.tube([[c[0] + dx * R, c[1] + dy * R, z], [c[0] + dx * t, c[1] + dy * t, z]], r, 4, 0);
+    }
+    for (const y of [H * 0.66]) m.tube([[-W / 2, y, z], [W / 2, y, z]], r, 4, 0);
+    for (const x of [-W / 2, W / 2]) for (const y of [0.1, H - 0.1]) m.bar([x, y, 0], [x, y, z], 0.02, 0.02);
+    return m;
+  },
+});

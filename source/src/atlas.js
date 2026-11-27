@@ -2,9 +2,9 @@
 // decal atlas: everything with letters or fine print, painted once at load time with Canvas 2D
 // ============================================================================
 // Graffiti and plates by the doors, the intercom panels, shop signs, the goods in the shop windows, notices. Each item
-// is drawn into its own cell of one 2048 x 2048 texture; makeAtlas() returns the canvas and, per name, the cell as
+// is drawn into its own cell of one 2048 x 4096 texture; makeAtlas() returns the canvas and, per name, the cell as
 // [u0, v0, u1, v1]. world.js asks for the cells by name (see DECALS there).
-const ATLAS = 2048, ATLASH = 3072;
+const ATLAS = 2048, ATLASH = 4096;
 function makeAtlas() {
   const cv = document.createElement('canvas'); cv.width = ATLAS; cv.height = ATLASH;
   const c = cv.getContext('2d'), R = {};
@@ -352,14 +352,48 @@ function makeAtlas() {
   });
   // ---- notices with tear-off strips (the strips are separate decals that flutter, see `tab`)
   const NOTES = [['ПРОДАМ', 'ГАРАЖ', 'кирпичный, яма, свет'], ['ПРОПАЛ', 'КОТ', 'рыжий, откликается на Барсик'], ['РЕМОНТ', 'КВАРТИР', 'плитка, обои, сантехника'], ['РЕПЕТИТОР', 'МАТЕМАТИКА', 'подготовка к экзаменам'],
-    ['СДАМ', 'КОМНАТУ', 'недорого, без посредников'], ['КУПЛЮ', 'КВАРТИРУ', 'в этом районе'], ['МАНИКЮР', 'НА ДОМУ', 'аккуратно, недорого'], ['ГРУЗО-', 'ПЕРЕВОЗКИ', 'грузчики, переезды']];
+    ['СДАМ', 'КОМНАТУ', 'недорого, без посредников'], ['КУПЛЮ', 'КВАРТИРУ', 'в этом районе'], ['МАНИКЮР', 'НА ДОМУ', 'аккуратно, недорого'], ['ГРУЗО-', 'ПЕРЕВОЗКИ', 'грузчики, переезды'],
+    ['ПРОПАЛА', 'СОБАКА', 'белая, отзывается на Тузик'], ['ИНТЕРНЕТ', '100 МБИТ', 'подключение бесплатно'], ['УРОКИ', 'ГИТАРЫ', 'для детей и взрослых'], ['НАТЯЖНЫЕ', 'ПОТОЛКИ', 'монтаж за один день'],
+    ['ОТДАМ', 'КОТЯТ', 'в добрые руки'], ['ВСКРЫТИЕ', 'ЗАМКОВ', 'круглосуточно']];
   NOTES.forEach(([a, b, d], i) => cell('tear' + i, 200, 168, (w, h) => {
     c.fillStyle = pick(['#f4f2ea', '#f0f0f0', '#f6f0d8', '#e8f0f4']); c.fillRect(0, 0, w, h);
     c.fillStyle = 'rgba(0,0,0,.06)'; c.fillRect(0, h - 6, w, 6);
-    c.textAlign = 'center'; c.fillStyle = i === 1 ? '#c01010' : '#111'; fit(a, FB, 34, w - 16); c.fillText(a, w / 2, 40); fit(b, FB, 34, w - 16); c.fillText(b, w / 2, 78);
+    c.textAlign = 'center'; c.fillStyle = i === 1 || i === 8 ? '#c01010' : '#111'; fit(a, FB, 34, w - 16); c.fillText(a, w / 2, 40); fit(b, FB, 34, w - 16); c.fillText(b, w / 2, 78);
     c.fillStyle = '#333'; fit(d, FN, 16, w - 16); c.fillText(d, w / 2, 106); fit('тел. 8-9' + (10 + i * 7) + '-...', FN, 18, w - 16); c.fillText('тел. 8-9' + (10 + i * 7) + '-' + (100 + i * 37) + '-' + (10 + i * 9), w / 2, 134);
     if (i === 1) { c.fillStyle = '#222'; c.beginPath(); c.ellipse(26, 120, 14, 11, 0, 0, TAU); c.fill(); c.beginPath(); c.moveTo(16, 112); c.lineTo(18, 100); c.lineTo(24, 110); c.moveTo(36, 112); c.lineTo(34, 100); c.lineTo(28, 110); c.fill(); }
   }));
+  // ---- what else is stuck by the doors: official notices taped up, signs, a stencil, house numbers, scratches on the doors
+  const OFFIC = [['ОБЪЯВЛЕНИЕ', ['Уважаемые жильцы!', '12 декабря с 9:00 до 18:00', 'будет отключена', 'горячая вода.', '', 'Управляющая компания']],
+    ['СОБРАНИЕ', ['ЖИЛЬЦОВ ДОМА', 'в субботу в 12:00', 'у второго подъезда.', 'Повестка: ремонт крыши,', 'уборка снега.', 'Явка обязательна!']],
+    ['ВНИМАНИЕ!', ['Возможен сход снега', 'и падение сосулек', 'с крыши дома.', 'Не оставляйте машины', 'у стены!', 'ЖЭУ № 4']],
+    ['ГРАФИК', ['вывоза мусора:', 'пн, ср, пт - 7:00', 'крупный мусор - сб', 'Не ставьте мешки', 'у контейнеров!', '']]];
+  OFFIC.forEach(([hd, L], i) => cell('offic' + i, 160, 220, (w, h) => {
+    c.fillStyle = '#f2f0e8'; c.fillRect(0, 0, w, h); c.fillStyle = 'rgba(0,0,0,.05)'; c.fillRect(0, h * 0.6, w, h * 0.4);
+    c.fillStyle = i === 2 ? '#c01010' : '#111'; c.textAlign = 'center'; fit(hd, FB, 26, w - 16); c.fillText(hd, w / 2, 34);
+    c.fillStyle = '#222'; L.forEach((l, k) => { fit(l, FN, 14, w - 14); c.fillText(l, w / 2, 62 + k * 22); });
+    c.fillStyle = 'rgba(220,215,180,.85)'; c.fillRect(w / 2 - 22, -2, 44, 12); c.fillRect(-4, h - 14, 30, 12); // tape
+  }));
+  cell('sNoSmoke', 96, 128, (w, h) => {
+    c.fillStyle = '#f4f4f0'; c.fillRect(0, 0, w, h); c.save(); c.translate(w / 2, 46); c.fillStyle = '#eee'; c.beginPath(); c.arc(0, 0, 38, 0, TAU); c.fill();
+    c.fillStyle = '#222'; c.fillRect(-26, -5, 44, 10); c.fillStyle = '#d06020'; c.fillRect(18, -5, 8, 10); c.strokeStyle = '#c01010'; c.lineWidth = 8; c.beginPath(); c.arc(0, 0, 36, 0, TAU); c.moveTo(-25, -25); c.lineTo(25, 25); c.stroke();
+    c.restore(); c.fillStyle = '#c01010'; c.textAlign = 'center'; fit('НЕ КУРИТЬ', FB, 18, w - 8); c.fillText('НЕ КУРИТЬ', w / 2, h - 14);
+  });
+  cell('sIcicle', 128, 112, (w, h) => {
+    c.fillStyle = '#f0d020'; c.beginPath(); c.moveTo(w / 2, 4); c.lineTo(w - 8, 66); c.lineTo(8, 66); c.closePath(); c.fill(); c.strokeStyle = '#111'; c.lineWidth = 4; c.stroke();
+    c.fillStyle = '#8ab0d0'; for (const x of [52, 64, 76]) { c.beginPath(); c.moveTo(x - 5, 26); c.lineTo(x + 5, 26); c.lineTo(x, 58 - (x === 64 ? 0 : 8)); c.fill(); }
+    c.fillStyle = '#f4f4f0'; c.fillRect(0, 72, w, 40); c.fillStyle = '#c01010'; c.textAlign = 'center'; fit('ОСТОРОЖНО!', FB, 18, w - 8); c.fillText('ОСТОРОЖНО!', w / 2, 90); c.fillStyle = '#111'; fit('СОСУЛЬКИ', FB, 16, w - 8); c.fillText('СОСУЛЬКИ', w / 2, 108);
+  });
+  cell('sNoAds', 256, 64, (w, h) => { c.fillStyle = 'rgba(20,20,20,.85)'; c.textAlign = 'center'; c.font = `bold 26px ${FB}`; c.fillText('РЕКЛАМУ', w / 2, 26); c.fillText('НЕ КЛЕИТЬ', w / 2, 56); c.fillStyle = 'rgba(20,20,20,.3)'; for (let k = 0; k < 30; k++) c.fillRect(rr(0, w), rr(0, h), 2, 2); });
+  cell('sCode', 128, 48, (w, h) => { c.strokeStyle = 'rgba(30,30,40,.8)'; c.lineWidth = 3; c.font = `italic 30px ${FN}`; c.fillStyle = 'rgba(30,30,60,.85)'; c.fillText('К1379', 6, 36); });
+  ['ул. Садовая', 'ул. Ленина', 'ул. Мира', 'ул. Школьная', 'пр. Строителей', 'ул. Лесная'].forEach((st, i) => cell('hnum' + i, 192, 120, (w, h) => {
+    c.fillStyle = '#1a3a8a'; c.fillRect(0, 0, w, h); c.strokeStyle = '#e8e8e8'; c.lineWidth = 5; c.strokeRect(5, 5, w - 10, h - 10);
+    c.fillStyle = '#fff'; c.textAlign = 'center'; fit(st, FN, 22, w - 24, 'bold'); c.fillText(st, w / 2, 34); c.font = `bold 62px ${FN}`; c.fillText(String([12, 7, 24, 3, 16, 9][i]), w / 2, 100);
+  }));
+  for (let i = 0; i < 3; i++) cell('scr' + i, 128, 192, (w, h) => {
+    // scratches and scuffs on a painted steel door: pale lines, a dent, the paint chipped
+    for (let k = 0; k < 14 + i * 6; k++) { const x = rr(0, w), y = rr(0, h), a = rr(-0.6, 0.6) + (k & 1 ? PI / 2 : 0), L = rr(10, 50); c.strokeStyle = `rgba(200,200,190,${rr(0.25, 0.6)})`; c.lineWidth = rr(0.8, 2); c.beginPath(); c.moveTo(x, y); c.lineTo(x + cos(a) * L, y + sin(a) * L); c.stroke(); }
+    for (let k = 0; k < 5; k++) { c.fillStyle = `rgba(120,90,60,${rr(0.4, 0.7)})`; c.beginPath(); c.ellipse(rr(10, w - 10), rr(10, h - 10), rr(2, 7), rr(2, 5), rr(0, PI), 0, TAU); c.fill(); }
+  });
   [0, 1, 2].forEach((i) => cell('tab' + i, 28, 112, (w, h) => {
     c.fillStyle = ['#f4f2ea', '#f0f0f0', '#f6f0d8'][i]; c.fillRect(1, 0, w - 2, h); c.fillStyle = 'rgba(0,0,0,.08)'; c.fillRect(w - 3, 0, 2, h);
     c.save(); c.translate(w / 2 + 5, h - 6); c.rotate(-PI / 2); c.fillStyle = '#222'; c.font = `14px ${FN}`; c.fillText('8-9' + (10 + i * 23) + '-' + (200 + i * 61) + '-' + (40 + i * 7), 0, 0); c.restore();

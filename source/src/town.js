@@ -41,8 +41,8 @@ function town(o) {
   const walker = (nm, w, pal, y = 0) => solid(nm, w[0], y, w[1], w[2], pal, w[5], w[3] + w[4] / 10, 7);
   // a notice with tear-off strips on a wall: p = toW-style point [x, y, z, yaw] at the notice's centre
   const notice = (x, y, z, a) => {
-    const k = rnd() * 8 | 0, [tx, tz] = rotY(1, 0, a), nz = [sin(a) * 0.012, cos(a) * 0.012];
-    decals.push(x + nz[0], y, z + nz[1], a, 0.3, 0.252, 0, 0, 'tear' + k);
+    const k = rnd() * 14 | 0, [tx, tz] = rotY(1, 0, a), nz = [sin(a) * 0.012, cos(a) * 0.012];
+    decals.push(x + nz[0], y, z + nz[1], a + rr(-0.03, 0.03), 0.3, 0.252, 8, 0, 'tear' + k);
     for (let j = 0; j < 7; j++) { if (rnd() < 0.3) continue; const s = (j - 3) * 0.041; decals.push(x + tx * s + nz[0] * 1.1, y - 0.126 - 0.068, z + tz * s + nz[1] * 1.1, a, 0.036, 0.136, 4, 0, 'tab' + (k % 3)); }
   };
   // a garland of bulbs that sags between two points
@@ -62,6 +62,15 @@ function town(o) {
     if (rnd() < 0.8) { const p = at(uc - 1.6 + rr(-0.1, 0.1), 2.5, 1.62); solid('icicles', p[0], p[1], p[2], p[3], 0, di, 1, 0, rr(0.8, 1.05)); if (rnd() < 0.35) snd.push(['drip', p[0], 2, p[2]]); }
     for (let k = 0; k < 1 + (rnd() < 0.5); k++) { const p = at(uc + (k ? -1 : 1) * rr(1.05, 1.45), rr(1.35, 1.6), 0); notice(p[0], p[1], p[2], p[3]); }
     if (rnd() < 0.3) garland(at(uc - 1.55, 2.47, 1.62), at(uc + 1.55, 2.47, 1.62), 0.12, 0.26);
+    // and the rest of what an entrance collects: an official notice taped up, a sign or two, the code scrawled by the
+    // intercom, a stencil, scratches on the door; every door its own mix
+    { const sd = rnd() < 0.5 ? -1 : 1;
+      if (rnd() < 0.55) dec(at(uc + sd * rr(1.0, 1.35), rr(1.45, 1.75), 0.014), 0.21, 0.29, 8, 0, 'offic' + (rnd() * 4 | 0));
+      if (rnd() < 0.35) dec(at(uc - sd * 0.95, 1.9, 0.013), 0.17, 0.23, 0, 0, 'sNoSmoke');
+      if (rnd() < 0.3) dec(at(uc + rr(-0.5, 0.5), 2.95, 0.013), 0.32, 0.28, 0, 0, 'sIcicle');
+      if (rnd() < 0.3) dec(at(uc + 0.45, 1.06, -0.2), 0.14, 0.05, 0, 0, 'sCode');
+      if (rnd() < 0.25) dec(at(uc - sd * rr(1.4, 2.0), rr(0.5, 0.9), 0.012), 0.62, 0.16, 0, 0, 'sNoAds');
+      if (rnd() < 0.7) dec(at(uc + rr(-0.15, 0.15), rr(0.6, 1.3), -0.206), 0.5, 0.75, 0, 0, 'scr' + (rnd() * 3 | 0)); }
     // what stands by the door: a pram is too much; a bicycle, a sled, a broom, a grit bin, a shovel in the snow, a cat
     const side = yardSide ? -1 : rnd() < 0.5 ? -1 : 1;
     const things = ['bike', 'sled', 'broom', 'sandbin', 'shovel', 'cat', 'bucket', 'sled', 'broom'];
@@ -75,7 +84,9 @@ function town(o) {
     if (bi >= 2 && b.t !== 2) {
       const p = at(uc - side * 2.6, 0, 1.4); solid('bench', p[0], g0(p[0], p[2]), p[2], p[3] - PI / 2, 8, uc);
       const q = at(uc - side * 3.6, 0, 1.4); solid('urn', q[0], g0(q[0], q[2]), q[2]);
-      if (!LAMPS.some((l) => l.t === -1 && hypot(l.x - x, l.z - z) < 2)) { const p2 = at(uc, 2.32, 0.95); solid('bulb', p2[0], p2[1] + 0.12, p2[2], 0, 0, -1); glare.push(p2[0], p2[1], p2[2], 0.45, 3.2, 1.9, 0.9, 0); }
+      // a bulb over the door: most burn, some stutter, a few are dead
+      if (!LAMPS.some((l) => l.t === -1 && hypot(l.x - x, l.z - z) < 2)) { const p2 = at(uc, 2.32, 0.95), st = rnd(), dead = st < 0.14, bad = st > 0.75;
+        solid('bulb', p2[0], p2[1] + 0.12, p2[2], 0, 0, dead ? -2 : bad ? -3 : -1); if (!dead) glare.push(p2[0], p2[1] + 0.12, p2[2], 0.45, 3.2, 1.9, 0.9, bad ? 13 : 0); }
     }
     // the walkway: over the lawn only, a strip of asphalt straight out from the steps
     const nx = sin(a), nz = cos(a), Lw = rr(5.5, 9);
@@ -97,6 +108,8 @@ function town(o) {
     if (nd && nd[3] === bi && rnd() < 0.5) PATHS.push([E, [(E[0] + nd[0] + sin(nd[2]) * 6) / 2 + rr(-1.5, 1.5), (E[1] + nd[1] + cos(nd[2]) * 6) / 2 + rr(-1.5, 1.5)], [nd[0] + sin(nd[2]) * 6, nd[1] + cos(nd[2]) * 6]]);
   });
   o.reg('walks', walks); solid('walks', 0, 0, 0);
+  // notices taped round the lamp posts of the estate and the town, at eye height, flapping in the wind
+  for (const [x, z, , k] of POLES.concat(DPOLES)) { if (k === 3 || rnd() > 0.4) continue; const a = rr(0, TAU), [dx, dz] = rotY(0, 0.1, a); decals.push(x + dx, g0(x, z) + rr(1.45, 1.7), z + dz, a, 0.24, 0.2, 8, 0, 'tear' + (rnd() * 14 | 0)); if (rnd() < 0.4) decals.push(x - dx * 0.9, g0(x, z) + rr(1.2, 1.4), z - dz * 0.9, a + PI, 0.2, 0.28, 8, 0, 'offic' + (rnd() * 4 | 0)); }
 
   // ---------------------------------------------------------------- the houses: dishes, fire ladders, roof things,
   // things on the open balconies, somebody smoking, garlands behind the balcony glass, pigeons, the lift motors
@@ -121,8 +134,10 @@ function town(o) {
       }
       // a garland behind balcony glass
       if (ty === 1 && zz > 0.5 && rnd() < 0.07) garland(toW(b, s, u - w / 2 + 0.15, y + 0.62, zz - 0.06), toW(b, s, u + w / 2 - 0.15, y + 0.62, zz - 0.06), 0.06, 0.22);
+      // a grille over a window of the ground floor (more of them on some houses than others)
+      if (ty === 0 && zz < 0 && y < 4 && rnd() < ihash(i, 3, 17) * 0.9) { const p = toW(b, s, u, y - h / 2 - 0.02, 0); solid(w > 1.6 ? 'grille1' : 'grille0', p[0], p[1], p[2], p[3]); }
       // a satellite dish beside a window
-      if (ty === 0 && zz < 0 && rnd() < 0.05 && y > 3) { const p = toW(b, s, u + w / 2 + 0.45, y + 0.2, 0); solid('dish', p[0], p[1], p[2], p[3], 0, rnd()); }
+      if (ty === 0 && zz < 0 && rnd() < 0.08 && y > 3) { const p = toW(b, s, u + w / 2 + 0.45, y + 0.2, 0); solid('dish', p[0], p[1], p[2], p[3], 0, rnd()); }
     }
     if (b.t === 0) { const p = toW(b, rnd() < 0.5 ? 2 : 3, b.D * rr(0.25, 0.75), 0, 0); solid('ladder', p[0], 0, p[2], p[3]); }
     if (b.t < 2 || b.t === 4) {
@@ -137,6 +152,8 @@ function town(o) {
       if (i === 1 || i === 2 || i === 4) for (let k = 0; k < 5; k++) { const p = toW(b, 0, b.L * 0.3 + k * 0.4 + rr(-0.1, 0.1), b.H, -0.12); solid('pigeon', p[0], p[1], p[2], p[3] + PI / 2 + rr(-0.5, 0.5), pick([1, 0, 9]), k); }
     }
   });
+  // the street and the number of every house on its corner, by the yard side
+  BLD.forEach((b, i) => { if (b.t === 2) return; dec(toW(b, 0, b.L - 0.9, b.T.base + 2.2, 0.02), 0.62, 0.39, 0, 0, 'hnum' + (i * 5 % 6)); });
   // the clock on the end wall of the tower C, lit
   { const b = BLD[3], p = toW(b, 2, b.D / 2, 21, 0.02); dec(p, 1.6, 1.6, 1, 0.55, 'clockBig'); }
 

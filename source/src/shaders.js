@@ -120,6 +120,8 @@ const S_B = S_G + /*wgsl*/`
 @group(0) @binding(6) var tM: texture_2d<f32>;
 @group(0) @binding(7) var tL: texture_2d<u32>;
 @group(0) @binding(8) var tA: texture_2d<f32>;
+// a bulb over a door on its way out: now and then it stutters for a while (each its own rhythm by where it hangs)
+fn faulty(p: vec3f) -> f32 { let t = g.cam.w; let ph = fract(dot(floor(p.xz * .5), vec2f(.137, .711)) * 7.31); let bad = fract(t / (6. + ph * 9.) + ph) > .74 && hs(floor(t * 9.) + ph * 13.) > .3; return select(1., .04 + .3 * hs(floor(t * 23.) + ph * 91.), bad); }
 fn fog(c: vec3f, wp: vec3f) -> vec3f { let v = wp - g.cam.xyz; let d = length(v); let T = max(exp(-sig() * d), .14 * (1. - g.ex.y)); return c * T + fogc(v / d) * (1. - T); }
 fn qrot(q: vec4f, v: vec3f) -> vec3f { return v + 2. * cross(q.xyz, cross(q.xyz, v) + q.w * v); }
 // the viewer's flat: lamp light from outside gets into a room only through its own window (d: vector to the lamp)
@@ -414,7 +416,9 @@ fn pal(i: f32) -> vec3f {
       else if (i.m.w > 1.5) {
         let f = fract(i.op.x / 1.45); let k = floor(i.op.x / 1.45) + sd * 31.;
         emi = vec3f(1.9, 1.3, .62) * (ss(.14, .2, f) * ss(.86, .8, f) * (.55 + .45 * hs(k)) * step(.12, hs(k + .5)));
-      } else if (sd < -.5) { emi = vec3f(14., 6.6, 1.9); }
+      } else if (sd < -2.5) { emi = vec3f(14., 6.6, 1.9) * faulty(i.wp); }
+      else if (sd < -1.5) { emi = vec3f(.05, .045, .04); }
+      else if (sd < -.5) { emi = vec3f(14., 6.6, 1.9); }
       else { let L = g.lamp[u32(sd + .5)]; emi = L.c.rgb * select(.09, 1.1, L.c.w < 0.); }
     }
     case 9 { alb = mix(vec3f(.16, .165, .17), vec3f(.10, .055, .03), ss(.55, .8, wS.a) * .7) * (.6 + .6 * wA.b); gl = .45; }
@@ -762,6 +766,12 @@ struct DO { @builtin(position) cp: vec4f, @location(0) wp: vec3f, @location(1) u
     // only near ones: too small to see further off, and each costs its pixels
     if (length(i.a.xyz - g.cam.xyz) > 45.) { w = vec3f(0., -1e4, 0.); }
   }
+  if (abs(i.b.z - 8.) < .5) {
+    // a sheet taped up by its top: the lower part lifts off the wall and shivers in the wind, curling more at its corners
+    let t = g.cam.w; let ph = dot(i.a.xz, vec2f(5.3, 8.9)); let k = (.5 - q.y * .5); let gu = g.wind.w;
+    let f = (.08 + .5 * gu) * (.6 + .4 * sin(t * (5. + 4. * gu) + ph) * sin(t * 2.3 + ph * 1.7)) * k * k * i.b.y;
+    w += vec3f(n.x, 0., n.y) * (f * (.7 + .5 * abs(q.x))) + vec3f(0., f * .25, 0.);
+  }
   if (abs(i.b.z - 4.) < .5) {
     // a tear-off strip of a notice: its free end lifts off the wall and flutters, harder in a gust
     let t = g.cam.w; let ph = dot(i.a.xz, vec2f(9.1, 7.3)); let k = (.5 - q.y * .5) * i.b.y; let gu = g.wind.w;
@@ -786,7 +796,7 @@ struct DO { @builtin(position) cp: vec4f, @location(0) wp: vec3f, @location(1) u
   let s = textureSample(tA, sR, i.uv); if (s.a < .004) { discard; }
   let a0 = s.rgb / s.a; var alb = a0 * a0; let n = vec3f(i.n.x, 0., i.n.y); let V = normalize(g.cam.xyz - i.wp); let md = i32(i.n.z + .5);
   var c = vec3f(0.);
-  if (md == 0 || md == 4) { let L = lit(i.wp, n, V, .25); c = alb * .75 * (L.d + FCOL * 1.2) + L.s * .2; }
+  if (md == 0 || md == 4 || md == 8) { let L = lit(i.wp, n, V, .25); c = alb * .75 * (L.d + FCOL * 1.2) + L.s * .2; }
   else if (md == 7) {
     // footprints: pressed into the snow, a shade of its blue; faint and wet where the ground is bare
     let L = lit(i.wp, vec3f(0., 1., 0.), V, .2); let gm = gmap(i.wp.xz); let k = sat(s.a * 2.2) * (.3 + .55 * ss(.4, .7, gm.g));
@@ -1075,6 +1085,7 @@ fn beyond(rd: vec3f, px: f32, cin: vec3f) -> vec3f {
   if (k == 2) { col *= .12 + 1.6 * pow(max(sin(t * .7), 0.), 24.); }
   // the gas under the kettle, while it is on
   if (k == 12) { col *= g.ex2.x; }
+  if (k == 13) { col *= faulty(p); }
   // a garland bulb: its colour steps round four with its neighbours (b.r is its place on the string)
   if (k == 3) { let C = array<vec3f, 4>(vec3f(2., .15, .1), vec3f(.2, 1.6, .25), vec3f(.25, .5, 2.4), vec3f(2., 1.3, .15)); let j = u32(floor(t * 1.3) + b.r * 37.) % 4u; col = C[j] * (.6 + .4 * sin(t * 2.3 + b.r * 40.)) * .5; }
   // the ambulance's blue lights while its event is on, two of them out of step

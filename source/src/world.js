@@ -450,7 +450,7 @@ function meshTree(kind, lo) {
       dir = [dir[0] + rr(-0.16, 0.16), dir[1] + rr(-0.1, 0.1) - (dep > 2 ? droop * 0.3 : -0.06 * dep), dir[2] + rr(-0.16, 0.16)];
       const l = hypot(...dir); dir = dir.map((c) => c / l); q = [q[0] + dir[0] * len / n, q[1] + dir[1] * len / n, q[2] + dir[2] * len / n]; pts.push(q);
     }
-    const w0 = dep ? (dep - 0.6) / MAXD : 0, w1 = (dep + 0.4) / MAXD, sides = lo ? (dep < 2 ? 5 : 3) : dep === 0 ? 8 : dep === 1 ? 6 : dep === 2 ? 5 : 3;
+    const w0 = dep ? (dep - 0.6) / MAXD : 0, w1 = (dep + 0.4) / MAXD, sides = lo ? (dep < 2 ? 5 : 3) : dep === 0 ? 11 : dep === 1 ? 8 : dep === 2 ? 6 : dep === 3 ? 4 : 3;
     m.tube(pts, (k) => r * (1 - 0.38 * k / n) * (dep || k ? 1 : 1.5), sides, dep === MAXD ? 2 : 0, (k) => clamp(mix(w0, w1, k / n), 0, 1));
     if (dep === MAXD) return;
     const kids = dep === 0 ? (kind === 0 ? 7 : 5) : lo && dep > 2 ? 2 : 2 + (rnd() < 0.65);
@@ -611,7 +611,8 @@ function makeWorld() {
   for (const k of ['uaz', 'ambulance', 'plow', 'tractor', 'walker', 'walkerW', 'janitor', 'courier', 'drunk', 'dog', 'dogLying', 'dogSmall', 'crow', 'bird', 'rowan', 'oldTree', 'tent', 'frameBld', 'watertower'])
     reg(k, PROPS5[k](), { noSh: ['walker', 'walkerW', 'janitor', 'courier', 'drunk', 'dogSmall'].includes(k) });
   for (const k of ['truck', 'semi', 'rv', 'bus', 'loco', 'tank', 'box', 'gondola', 'flat', 'kiosk']) reg(k, PROPS3[k](), { noSh: ['loco', 'tank', 'box', 'gondola', 'flat'].includes(k) });
-CARS.forEach((c, t) => reg('car' + t, meshCar(t)));
+  CARS.forEach((c, t) => reg('car' + t, meshCar(t)));
+  reg('grille0', PROPS9.grille(1.55, 1.55)); reg('grille1', PROPS9.grille(1.9, 1.5));
   for (let k = 0; k < 4; k++) reg('tree' + k, meshTree(k, LV > 1));
   reg('tree4', PROPS3.spruce(LV > 1)); reg('tree5', PROPS3.spruce(true)); // the second for the far forest
   reg('pav0', PROPS3.pavilion(14, 9)); reg('pav1', PROPS3.pavilion(10, 7));
