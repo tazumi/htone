@@ -868,8 +868,27 @@ CARS.forEach((c, t) => reg('car' + t, meshCar(t)));
   //     animals of the forest, the people and dogs of life.js (decal mode 7: the shader shows them where snow lies)
   {
     const fp = (x, y, z, a, paws) => { if ((x > APTB[0] && x < APTB[3] && z > APTB[2] && z < APTB[5] && y > APTB[1] - 1) || boxes.some((h) => x > h[0] && x < h[2] && z > h[1] && z < h[3] && h[4] > 2)) return; decals.push(x, y + 0.012, z, a, paws ? 0.3 : 0.42, paws ? 1 : 1.4, 7, 0, paws ? 'paws' : 'steps'); };
-    for (const [x, y, z, a, L, paws] of walk7) { const st = paws ? 1 : 1.4, [dx, dz] = rotY(0, 1, a); for (let s = st / 2; s < L; s += st) { const px = x + dx * s, pz = z + dz * s; fp(px, max(y, grassY(px, pz), onStreet(px, pz) ? ST_Y : 0), pz, a, paws); } }
-    for (const [P, paws] of TRAILS) { const st = paws ? 1 : 1.4; for (let s = 1.6; s < P.L - (P.closed ? 0 : 1.6); s += st) { const u = s / P.L * (P.N - 1), i = min(floor(u), P.N - 2), dx = P.X[i + 1] - P.X[i], dz = P.Z[i + 1] - P.Z[i]; fp(mix(P.X[i], P.X[i + 1], u - i), mix(P.Y[i], P.Y[i + 1], u - i), mix(P.Z[i], P.Z[i + 1], u - i), atan2(dx, dz), paws); } }
+    // nobody walks a ruled line: the way wanders from side to side in slow swings, every step lands a little off, now
+    // and then somebody else went the same way a step or so aside (amp: how far the swings go)
+    const wander = (L, paws, amp, f) => {
+      const st = paws ? 1 : 1.4, p1 = rr(0, TAU), p2 = rr(0, TAU), w1 = rr(0.05, 0.11), w2 = rr(0.17, 0.3);
+      const side = (s) => amp * (sin(s * w1 + p1) * 0.7 + sin(s * w2 + p2) * 0.3);
+      for (let s = st / 2 + rr(0, st); s < L; s += st * rr(0.9, 1.1)) { const sd = side(s), da = atan2(side(s + 0.5) - side(s - 0.5), 1); f(s, sd + rr(-0.05, 0.05), da + rr(-0.12, 0.12)); }
+    };
+    for (const [x, y, z, a, L, paws] of walk7) {
+      const [dx, dz] = rotY(0, 1, a), [rx, rz] = rotY(1, 0, a);
+      for (let c = 0; c < (!paws && rnd() < 0.3 ? 2 : 1); c++) {
+        const off = c ? rr(0.6, 1.3) * (rnd() < 0.5 ? -1 : 1) : 0;
+        wander(L, paws, paws ? 0.35 : 0.3, (s, sd, da) => { const px = x + dx * s + rx * (sd + off), pz = z + dz * s + rz * (sd + off); fp(px, max(y, grassY(px, pz), onStreet(px, pz) ? ST_Y : 0), pz, a + da, paws); });
+      }
+    }
+    for (const [P, paws] of TRAILS) {
+      const at = (s) => { const u = clamp(s, 0, P.L) / P.L * (P.N - 1), i = min(floor(u), P.N - 2), f = u - i; return [mix(P.X[i], P.X[i + 1], f), mix(P.Y[i], P.Y[i + 1], f), mix(P.Z[i], P.Z[i + 1], f), atan2(P.X[i + 1] - P.X[i], P.Z[i + 1] - P.Z[i])]; };
+      for (let c = 0; c < (!paws && rnd() < 0.4 ? 2 : 1); c++) {
+        const off = c ? rr(0.7, 1.4) * (rnd() < 0.5 ? -1 : 1) : 0, end = P.L - (P.closed ? 0 : 1.6);
+        wander(end, paws, paws ? 0.45 : 0.4, (s, sd, da) => { if (s < 1.6) return; const [px, py, pz, a] = at(s), k = sd + off; fp(px + cos(a) * k, py, pz - sin(a) * k, a + da, paws); });
+      }
+    }
   }
   // --- every entrance door: the leaf (anim 15: life.js opens some through their slots, the rest stay shut) and the lobby
   DOORS.forEach(([, , , bi, , uc], di) => { const b = BLD[bi], p = toW(b, 0, uc - 0.7, 0.13, -0.22), o = DSLOT[di] || 0; solid('entHall', p[0], p[1], p[2], p[3], 0, di, o, 15); solid('entLeaf', p[0], p[1], p[2], p[3], b.pal, di, o, 15); });

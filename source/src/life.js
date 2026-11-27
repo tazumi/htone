@@ -255,6 +255,23 @@ function life(W) {
       TRAILS.push([Q, 1]);
     }
   }
+  // stray dogs wandering through the yards, one or two at a time: they trot along, stop to sniff at something, trot on
+  {
+    const ROUTES = [[[2, 32], [2, -10], [2, -48], [24, -59], [45, -56], [58, -40], [56, -14], [54, 26], [40, 30], [20, 30]],
+      [[-24.5, -50], [-27.2, -20], [-27.2, 0], [-26, 40], [-60, 32], [-72, -10], [-77, -60], [-40, -77], [-27, -78], [-24.5, -66]],
+      [[-300, -22], [-340, -22], [-345, 0], [-300, 0]], [[-305, 75], [-340, 75], [-340, 95], [-300, 95]], [[214, 394], [254, 394], [254, 418], [214, 418]]];
+    ROUTES.forEach((R, ri) => {
+      const n = ri < 2 ? 2 : 1, v = rr(1.3, 1.7), C = rr(16, 26), go = C * rr(0.55, 0.75), s0 = rr(0, 500);
+      for (let k = 0; k < n; k++) {
+        const P = mkPath(R.map(([x, z]) => [x, z, gy(x, z)]), { closed: true, r: 4, lane: k ? 0.8 : 0 }), d = k * rr(1.5, 3);
+        // time spent walking up to t: whole periods, then the walking part of the current one
+        const o = slot((t) => { const c = floor(t / C), f = t - c * C, w = c * go + min(f, go); pose(P, s0 + v * w - d, o, true); setB(o, f < go ? 7.5 * v : 0, 0, 0, f < go ? 1 : 0); });
+        body(ri < 4 && k ? 'dogSmall' : 'dog', o, pick([6, 8, 9, 0, 1]), [], rr(0.8, 1.0));
+        if (!k && ri < 2) ASND.push(['bark', o]);
+        TRAILS.push([P, 1]);
+      }
+    });
+  }
   // --- the rink on the lake in the park: boards, floodlights, a loudspeaker playing, skaters going round; the ice slide
   //     on the shore with children going up the ladder, down on their sleds and back round
   {
