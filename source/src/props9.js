@@ -42,3 +42,58 @@ const PROPS9 = {
     return m;
   },
 };
+
+// ---------------------------------------------------------------- more for the viewer's flat (looked up by name in PROPS7)
+Object.assign(PROPS7, {
+  bookcase() { // open bookcase 0.8 wide (x -0.4..0.4), 2.0 high, 0.32 deep (z 0..0.32), back against z = 0, five shelves of books,
+    // a few things in front of them: a clock, a china figure, a photo, a box
+    const m = new Mesh().mat(M_BARK), D = 0.32, ys = [0.06, 0.44, 0.8, 1.16, 1.52, 1.88];
+    m.box(-0.4, 0, 0, -0.38, 2, D, 0, 0.6, 1); m.box(0.38, 0, 0, 0.4, 2, D, 0, 0.6, 1); m.box(-0.4, 1.98, 0, 0.4, 2, D, 0, 1, 1);
+    m.box(-0.38, 0, 0, 0.38, 2, 0.01, 0, 0.5, 0.8);
+    for (const y of ys) m.box(-0.38, y - 0.02, 0, 0.38, y, D, 0, 0.7, 1);
+    ys.slice(0, 5).forEach((y, k) => p7books(m, -0.37 + (k & 1 ? 0.12 : 0), k === 2 ? 0.1 : 0.37, y, 0.02, D - 0.04, 0.3, k * 5 + 1));
+    m.mat(M_YEL).box(0.16, 0.8, 0.12, 0.3, 0.92, 0.22, 4); m.mat(M_CONC); p7ring(m, 0.23, 0.17, [[0.92, 0.035], [0.95, 0.03]], 8); // a small clock
+    m.mat(M_CONC); p7ring(m, -0.28, 0.2, [[0.44, 0.03], [0.5, 0.035], [0.56, 0.02], [0.6, 0.025], [0.63, 0.001]], 8); // a china dancer
+    m.mat(M_BARK).box(0.18, 1.52, 0.18, 0.32, 1.7, 0.2, 4, 1, 1); m.mat(M_CONC).box(0.195, 1.535, 0.2, 0.305, 1.685, 0.203, 4); // a photo in a frame
+    m.mat(M_RED).box(-0.36, 1.16, 0.06, -0.2, 1.24, 0.26, 4); // a box of letters
+    return m;
+  },
+  guitar() { // an acoustic guitar leaning back against a wall at z = 0: the foot at the origin, 1.0 tall, 0.4 wide, face to +z
+    const m = new Mesh(), tl = 0.16, P = (x, y, z) => [x, y * cos(tl), z - y * sin(tl) + 0.2];
+    const bodyRing = (cy, r) => { const pts = []; for (let k = 0; k <= 14; k++) { const a = k / 14 * TAU; pts.push([cos(a) * r, cy + sin(a) * r]); } return pts; };
+    // the body: two rounds side by side in depth (z), a soundhole on the front, the neck and the head
+    for (const [cy, r] of [[0.2, 0.19], [0.44, 0.145]]) {
+      m.mat(M_BARK); const R = bodyRing(cy, r);
+      for (let k = 0; k < 14; k++) { const a = R[k], b = R[k + 1]; m.q4(P(a[0], a[1], -0.05), P(b[0], b[1], -0.05), P(b[0], b[1], 0.05), P(a[0], a[1], 0.05), 0.8); }
+      m.mat(M_YEL); const c = m.v(...P(0, cy, 0.05)); const rim = R.map(([x, y]) => m.v(...P(x, y, 0.05))); for (let k = 0; k < 14; k++) m.tri(c, rim[k], rim[k + 1]);
+      m.mat(M_DARK); const c2 = m.v(...P(0, cy, -0.05)); const rim2 = R.map(([x, y]) => m.v(...P(x, y, -0.05))); for (let k = 0; k < 14; k++) m.tri(c2, rim2[k + 1], rim2[k]);
+    }
+    m.mat(M_DARK); const h = bodyRing(0.37, 0.045).map(([x, y]) => m.v(...P(x, y, 0.052))), hc = m.v(...P(0, 0.37, 0.052)); for (let k = 0; k < 14; k++) m.tri(hc, h[k], h[k + 1]);
+    m.mat(M_BARK); m.bar(P(0, 0.58, 0.03), P(0, 0.92, 0.03), 0.05, 0.03); m.mat(M_DARK).bar(P(0, 0.92, 0.025), P(0, 1.02, 0.02), 0.07, 0.025);
+    m.mat(M_METAL); for (let k = -2; k <= 2; k++) m.bar(P(k * 0.007, 0.12, 0.055), P(k * 0.004, 0.92, 0.047), 0.0015, 0.0015);
+    return m;
+  },
+  slippers() { // a pair of felt slippers on the floor, toes to +z, 0.3 long
+    const m = new Mesh().mat(M_RED);
+    for (const x of [-0.07, 0.07]) { m.box(x - 0.045, 0, -0.14, x + 0.045, 0.025, 0.14, 0, 0.7, 1); m.mat(M_TINT); p2loft(m, [p2R(0.025, 0.045, 0.07, x, 0.06), p2R(0.06, 0.035, 0.05, x, 0.07), p2R(0.07, 0.01, 0.01, x, 0.09)], 8, false, true); m.mat(M_RED); }
+    return m;
+  },
+  sideboard() { // kitchen sideboard 1.2 wide (x -0.6..0.6), 0.85 high, 0.45 deep (z 0..0.45), back against z = 0; on it a microwave,
+    // a bread bin, a radio, jars of grain; a shelf over it with plates standing
+    const m = new Mesh().mat(M_TINT), D = 0.45;
+    m.box(-0.6, 0.06, 0, 0.6, 0.85, D, 16, 0.5, 1); m.mat(M_DARK).box(-0.58, 0, 0.02, 0.58, 0.06, D - 0.03, 16);
+    m.mat(M_CONC).box(-0.62, 0.85, 0, 0.62, 0.88, D + 0.02, 0, 1, 1);
+    for (const x of [-0.3, 0.3]) { m.mat(M_TINT); p7panel(m, x - 0.28, 0.1, x + 0.28, 0.8, D); m.mat(M_METAL).box(x + (x < 0 ? 0.2 : -0.22), 0.6, D + 0.006, x + (x < 0 ? 0.22 : -0.2), 0.7, D + 0.02); }
+    // the microwave
+    m.mat(M_CONC).box(0.05, 0.88, 0.05, 0.55, 1.17, 0.4, 0, 0.7, 1); m.mat(M_GLASS).box(0.08, 0.92, 0.4, 0.4, 1.13, 0.404, 16); m.mat(M_DARK).box(0.43, 0.92, 0.4, 0.52, 1.13, 0.403, 16);
+    m.mat(M_LAMP).box(0.45, 1.09, 0.403, 0.5, 1.11, 0.405, 16);
+    // the bread bin with a loaf showing, the radio, the jars
+    m.mat(M_RED).box(-0.55, 0.88, 0.08, -0.2, 1.06, 0.36, 0, 0.7, 1); m.mat(M_BARK); p2ball(m, -0.37, 1.07, 0.22, 0.08, 4, 8, 0.5);
+    m.mat(M_BARK).box(-0.15, 0.88, 0.25, 0.02, 0.98, 0.32, 0, 0.7, 1); m.mat(M_DARK).box(-0.13, 0.9, 0.32, -0.04, 0.96, 0.322, 16); m.mat(M_METAL).bar([-0.13, 0.98, 0.29], [-0.18, 1.12, 0.27], 0.004);
+    for (let k = 0; k < 3; k++) { const x = 0.28 + k * 0.095; m.mat(M_LENS); p7ring(m, x, 0.13, [[1.4, 0.04], [1.55, 0.04], [1.56, 0.03]], 8); m.mat(M_YEL); p7ring(m, x, 0.13, [[1.56, 0.033], [1.585, 0.033]], 8); }
+    // the shelf on the wall above, plates on edge along its back
+    m.mat(M_BARK).box(-0.6, 1.38, 0, 0.6, 1.4, 0.24, 0, 0.7, 1); for (const x of [-0.5, 0.5]) m.box(x - 0.01, 1.28, 0, x + 0.01, 1.38, 0.18, 0, 0.6, 1);
+    m.mat(M_CONC); for (let k = 0; k < 5; k++) { const x = -0.2 + k * 0.1; m.tube([[x, 1.53, 0.04], [x, 1.53, 0.06]], 0.12, 12, 3); }
+    return m;
+  },
+});

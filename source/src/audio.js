@@ -204,7 +204,7 @@ function mkSound(ac) {
     const ahead = t + 0.25;
     for (const o of S) {
       if (o.w) { const p = walkAt(o.w, F[TIME]); o.x = p[0]; o.z = p[1]; }
-      let gate = o.tv >= 0 ? FLAT.tv[o.tv] : 1;
+      let gate = o.tv >= 0 ? (FLAT.tv[o.tv] ? 1 : 0) : 1;
       if (o.a) {
         const k = o.a * 8, nx = ACT[k], nz = ACT[k + 2]; gate = ACT[k + 1] > -50 && ACT[k + 7] > 0.5 ? 1 : 0;
         o.v = mix(o.v, min(hypot(nx - o.px, nz - o.pz) / 0.1, 30), 0.3); o.px = nx; o.pz = nz; o.x = nx; o.y = ACT[k + 1] + 1; o.z = nz;
@@ -227,11 +227,16 @@ function mkSound(ac) {
         }
       } else if (o.kind === 'radio' || o.kind === 'tv' || o.kind === 'tvroom') {
         // the programme changes now and then: a song (a waltz on an old station) or somebody talking
-        if (t > o.progT) { o.prog = o.kind !== 'radio' ? 1 : rnd() < 0.6 ? 0 : 1; o.progT = t + rr(25, 60); o.step = 0; }
+        // the flat's televisions play what their channel shows: music for the concert and the film, talk for the rest
+        const ch = o.kind === 'tvroom' ? FLAT.tv[o.tv] : -1;
+        if (ch >= 0) { const p = ch === 2 || ch === 4 ? 0 : 1; if (p !== o.prog || ch !== o.ch) { o.prog = p; o.ch = ch; o.step = 0; o.next = t; } }
+        else if (t > o.progT) { o.prog = o.kind !== 'radio' ? 1 : rnd() < 0.6 ? 0 : 1; o.progT = t + rr(25, 60); o.step = 0; }
         if (o.prog === 0) {
-          const st = 60 / 132;
+          // a waltz; the concert is a quicker song in four
+          const bt = o.ch === 2 ? 4 : 3, st = 60 / (o.ch === 2 ? 150 : 132);
           for (; o.next < ahead; o.next += st, o.step++) {
-            const b = o.step % 3, bar = (o.step / 3 | 0) % 8, r = 50 + [0, 5, 7, 0, 5, 7, 2, 0][bar];
+            const b = o.step % bt, bar = (o.step / bt | 0) % 8, r = 50 + (o.ch === 2 ? [0, 0, 5, 5, 7, 7, 3, 5] : [0, 5, 7, 0, 5, 7, 2, 0])[bar];
+            if (o.ch === 2 && (b === 0 || b === 2)) burst(b ? 1800 : 160, b ? 0.9 : 1.2, o.next, b ? 0.08 : 0.16, 0.12, o.band);
             o.vg.gain.setTargetAtTime(0, o.next, 0.05);
             tone(b ? 'triangle' : 'sawtooth', note(b ? r + 7 + (b === 2 ? 5 : 0) : r - 12), o.next, 0.005, b ? 0.06 : 0.12, st * 0.7, o.band);
             if (rnd() < 0.8) tone('triangle', note(62 + PENTA[(o.step * 5 + bar * 3 + (rnd() * 3 | 0)) % 8]), o.next, 0.02, 0.09, st * rr(0.8, 2), o.band);
@@ -240,7 +245,7 @@ function mkSound(ac) {
           // syllables: the formants jump, the voice gates in and out, pauses between phrases
           for (; o.next < ahead; o.step++) {
             const a = o.next, dur = rr(0.09, 0.22), pause = o.step % 9 === 8 ? rr(0.3, 0.9) : 0;
-            o.f1.frequency.setTargetAtTime(rr(300, 850), a, 0.02); o.f2.frequency.setTargetAtTime(rr(900, 2300), a, 0.02); o.vo.frequency.setTargetAtTime((o.seed % 2 > 1 ? 190 : 115) * rr(0.9, 1.15), a, 0.04);
+            o.f1.frequency.setTargetAtTime(rr(300, 850), a, 0.02); o.f2.frequency.setTargetAtTime(rr(900, 2300), a, 0.02); o.vo.frequency.setTargetAtTime((o.ch === 3 ? ((o.step / 9 | 0) & 1 ? 205 : 112) : o.seed % 2 > 1 ? 190 : 115) * rr(0.9, 1.15), a, 0.04);
             o.vg.gain.setTargetAtTime(pause ? 0 : rr(0.25, 0.5), a, 0.015); o.vg.gain.setTargetAtTime(0.02, a + dur * 0.8, 0.02);
             o.next = a + dur + pause;
           }

@@ -750,7 +750,8 @@ fn spot(o: vec3f, d: vec3f, b: vec3f, tm: f32, k: f32) -> f32 { let pl = b - o; 
 // stutters now and then.
 const W_DEC = S_B + /*wgsl*/`
 struct DI { @location(0) a: vec4f, @location(1) b: vec4f, @location(2) c: vec4f };
-struct DO { @builtin(position) cp: vec4f, @location(0) wp: vec3f, @location(1) uv: vec2f, @location(2) @interpolate(flat) n: vec4f, @location(3) @interpolate(flat) sd: f32 };
+struct DO { @builtin(position) cp: vec4f, @location(0) wp: vec3f, @location(1) uv: vec2f, @location(2) @interpolate(flat) n: vec4f, @location(3) @interpolate(flat) sd: f32,
+  @location(4) lq: vec2f, @location(5) @interpolate(flat) fr: vec4f };
 @vertex fn vs(@builtin(vertex_index) vi: u32, i: DI) -> DO {
   var o: DO; let q = vec2f(f32(vi & 1u), f32(vi >> 1u)) * 2. - 1.;
   let n = vec2f(sin(i.a.w), cos(i.a.w)); let r = vec2f(n.y, 0. - n.x);
@@ -768,11 +769,22 @@ struct DO { @builtin(position) cp: vec4f, @location(0) wp: vec3f, @location(1) u
     w += vec3f(n.x, 0., n.y) * (k * f * 1.1) + vec3f(r.x, 0., r.y) * (k * f * .5 * sin(t * 5.1 + ph)) + vec3f(0., k * f * f * .4, 0.);
   }
   o.cp = g.vp * vec4f(w, 1.); o.wp = w; o.uv = mix(i.c.xy, i.c.zw, vec2f(q.x * .5 + .5, .5 - q.y * .5)); o.n = vec4f(n, i.b.zw); o.sd = i.a.x * .37 + i.a.z * .11;
+  o.lq = vec2f(q.x * .5 + .5, .5 - q.y * .5); o.fr = vec4f(0.);
+  if (abs(i.b.z - 3.) < .5 || abs(i.b.z - 6.) < .5) {
+    // a television (3 the kitchen's, 6 the living room's): its channel (ex.w, ex.z; 0 off) picks the frames of the
+    // picture strip (atlas.js), and the camera cuts between them every few seconds
+    let ch = i32(select(g.ex.w, g.ex.z, abs(i.b.z - 6.) < .5) + .5);
+    var base = 0.; var cnt = 2.; var dur = 9.;
+    if (ch == 2) { base = 2.; dur = 5.; } else if (ch == 3) { base = 4.; cnt = 3.; dur = 3.7; } else if (ch == 4) { base = 7.; cnt = 1.; }
+    let seg = floor((g.cam.w + i.a.x * 3.) / dur); let fr = base + floor(hs(seg + i.a.z * .37) * cnt * .999);
+    let du = (i.c.z - i.c.x) / ${TVF * TVS - 8}.; let u0 = i.c.x + fr * ${TVS}. * du; let uw = ${TVS - 8}. * du;
+    o.uv.x = u0 + o.lq.x * uw; o.fr = vec4f(u0, uw, f32(ch), fr);
+  }
   return o;
 }
 @fragment fn fs(i: DO) -> @location(0) vec4f {
   let s = textureSample(tA, sR, i.uv); if (s.a < .004) { discard; }
-  let a0 = s.rgb / s.a; let alb = a0 * a0; let n = vec3f(i.n.x, 0., i.n.y); let V = normalize(g.cam.xyz - i.wp); let md = i32(i.n.z + .5);
+  let a0 = s.rgb / s.a; var alb = a0 * a0; let n = vec3f(i.n.x, 0., i.n.y); let V = normalize(g.cam.xyz - i.wp); let md = i32(i.n.z + .5);
   var c = vec3f(0.);
   if (md == 0 || md == 4) { let L = lit(i.wp, n, V, .25); c = alb * .75 * (L.d + FCOL * 1.2) + L.s * .2; }
   else if (md == 7) {
@@ -786,7 +798,18 @@ struct DO { @builtin(position) cp: vec4f, @location(0) wp: vec3f, @location(1) u
       f = select(1., .12 + .3 * hs(floor(t * 23.)), fract(t / 13. + sd) > .93 && hs(floor(t * 11.) + sd) > .4); }
     // a television: the picture breathes with the scene, scan lines across it
     // (3: the kitchen's, 6: the living room's, each on or off as the flat has them: ex.w, ex.z)
-    if (md == 3 || md == 6) { let t = g.cam.w; f = (.55 + .45 * hs(floor(t * 3.))) * (.85 + .15 * sin(i.uv.y * 3000.)) * (.9 + .1 * hs(floor(t * 25.))) * select(g.ex.w, g.ex.z, md == 6); }
+    if (md == 3 || md == 6) {
+      let t = g.cam.w; let ch = i32(i.fr.z + .5); let q = i.lq; var a = alb;
+      // the news: the line along the bottom runs
+      if (i.fr.w < .5 && q.y > .84 && q.y < .93 && q.x > .24) { let s2 = textureSampleLevel(tA, sR, vec2f(i.fr.x + (.24 + fract((q.x - .24) / .76 + t * .05) * .76) * i.fr.y, i.uv.y), 0.); a = s2.rgb * s2.rgb / max(s2.a * s2.a, 1e-3); }
+      // the concert: the beams sweep the hall, everything jumps on the beat
+      if (ch == 2) { for (var k = 0; k < 3; k++) { let fk = f32(k); let x = .5 + .42 * sin(t * (.7 + fk * .23) + fk * 2.1); a += hue(fract(t * .07 + fk * .33)) * pow(sat(1. - abs(q.x - mix(x, .5, q.y)) * 7.), 2.) * (1. - q.y) * .6; }
+        a *= .75 + .45 * step(fract(t * 2.1), .12); }
+      // the winter film: snow falls over it
+      if (ch == 4) { a += vec3f(.8) * step(.993, hs(floor(q.x * 70.) + floor(q.y * 56. - t * 4. + sin(q.x * 9.)) * 71.3)); }
+      alb = a;
+      f = (.75 + .25 * hs(floor(t * 3.))) * (.85 + .15 * sin(i.uv.y * 3000.)) * (.9 + .1 * hs(floor(t * 25.))) * f32(ch > 0);
+    }
     // the club's glass blocks: lit from inside by the lights of the dance floor, colours sweeping along
     if (md == 5) { let t = g.cam.w; let bt = fract(t * 2.13); return vec4f(fog(alb * hue(fract(t * .11 + i.wp.x * .02 + i.wp.z * .02)) * i.n.w * (.35 + .65 * step(bt, .5) + .8 * step(.97, hs(floor(t * 8.)))), i.wp) * s.a, s.a); }
     c = alb * (i.n.w * f);

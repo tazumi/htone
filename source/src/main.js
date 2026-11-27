@@ -395,8 +395,12 @@ function render() {
   // the flat's lights as its switches have them, the televisions flickering with their pictures (when on)
   ALAMP.forEach((l, j) => { if (j === 1) return; const o = U_LAMP + (AL0 + j) * 8 + 4, f = FLAT.light[j]; m[o] = l[5][0] * f; m[o + 1] = l[5][1] * f; m[o + 2] = l[5][2] * f; });
   m[U_EX] = F[KET]; m[U_EX + 1] = F[BLZ]; m[U_EX + 2] = FLAT.tv[1]; m[U_EX + 3] = FLAT.tv[0]; m[U_EX + 4] = FLAT.kettle > 0 ? 1 : 0; m[U_EX + 5] = F[CALM];
-  { const o = U_LAMP + TVL * 8 + 4, c = LAMPS[TVL].c, f = FLAT.tv[0] * (0.55 + 0.45 * fract(sin(floor(F[TIME] * 3) * 127.1) * 43758.5453)); m[o] = c[0] * f; m[o + 1] = c[1] * f; m[o + 2] = c[2] * f; }
-  { const o = U_LAMP + TVL2 * 8 + 4, c = LAMPS[TVL2].c, f = FLAT.tv[1] * (0.5 + 0.5 * fract(sin(floor(F[TIME] * 2.3 + 0.5) * 91.7) * 43758.5453)); m[o] = c[0] * f; m[o + 1] = c[1] * f; m[o + 2] = c[2] * f; }
+  // the glow of each television takes the colour of its channel (TVCOL, world.js), a concert's beating with the music
+  for (let j = 0; j < 2; j++) {
+    const ch = FLAT.tv[j], o = U_LAMP + (j ? TVL2 : TVL) * 8 + 4, c = TVCOL[ch], s = j ? 0.9 : 1, t = F[TIME];
+    const f = (ch ? 1 : 0) * (0.6 + 0.4 * fract(sin(floor(t * (j ? 2.3 : 3) + j * 0.5) * (j ? 91.7 : 127.1)) * 43758.5453)) * (ch === 2 ? 0.7 + 0.6 * (fract(t * 2.1) < 0.12 ? 1 : 0) : 1);
+    m[o] = c[0] * f * s; m[o + 1] = c[1] * f * s; m[o + 2] = c[2] * f * s;
+  }
   // the watchman's fire breathes and flickers
   { const o = U_LAMP + FIREL * 8 + 4, c = LAMPS[FIREL].c, t = F[TIME], f = 0.72 + 0.18 * sin(t * 2.3) * sin(t * 3.7) + 0.16 * fract(sin(floor(t * 14) * 78.2) * 43758.5); m[o] = c[0] * f; m[o + 1] = c[1] * f; m[o + 2] = c[2] * f; }
   // the club's light over its door goes round the colours on the beat
@@ -503,9 +507,9 @@ const inB = (b, x, y, z, m) => x > b[0] + m && x < b[3] - m && y > b[1] + m && y
 // the doorway of a shut door is not free; AT_DOOR[i]: the door of AFREE box i
 const AT_DOOR = AFREE.map((b, i) => FLAT.doors.find((d) => (d.ad < 0 ? APT.length + ADOOR.length : APT.length + d.ad) === i));
 const shut = (i) => AT_DOOR[i] && ACT[AT_DOOR[i].o * 8 + 6] < 0.65;
-const free = (x, y, z) => inB(TUN, x, y, z, 0.1) || AFREE.some((b, i) => !shut(i) && inB(b, x, y, z, i < APT.length ? 0.22 : 0.1));
+const free = (x, y, z) => inB(TUN, x, y, z, 0.1) || inB(BTUN, x, y, z, 0.1) || AFREE.some((b, i) => !shut(i) && inB(b, x, y, z, i < APT.length ? 0.22 : 0.1));
 // inside the walls of the viewer's house
-// (the balcony is part of it: its parapet and the slab over it keep one in)
+// (the balcony is part of it: its parapet and the slab over it keep one in, but for the way out over the parapet)
 const BALC = AFREE[AFREE.length - 1], BALE = [BALC[0] - 0.45, BALC[1] - 0.45, BALC[2] - 0.45, BALC[3] + 0.45, RY + 2.75, BALC[5] + 0.45];
 const home = (x, y, z) => ((x > BX[0] - CR && x < BX[2] + CR && z > BX[1] - CR && z < BX[3] + CR && y < BX[4] + CR) || inB(BALE, x, y, z, 0)) && !free(x, y, z);
 function collide() {
@@ -545,7 +549,7 @@ function use() {
   if (useK < 0) return;
   const u = USE[useK], t = F[TIME];
   if (u.kind === 'light') FLAT.light.forEach((v, j) => { if (j !== 1 && ALAMP[j][0] === u.i) FLAT.light[j] = v ? 0 : 1; });
-  else if (u.kind === 'tv') FLAT.tv[u.i] ^= 1;
+  else if (u.kind === 'tv') FLAT.tv[u.i] = (FLAT.tv[u.i] + 1) % TVCOL.length; // the next channel, after the last one off
   else if (u.kind === 'kettle') { if (FLAT.kettle === 2) FLAT.kettle = 0; else { FLAT.kettle = 2; FLAT.boil = t; } }
   else if (u.kind === 'door') {
     // a door can't be shut on the one standing in it

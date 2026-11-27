@@ -70,6 +70,9 @@ const WINB = boxW(RU - 0.725, RY + 0.95, -0.3, RU + 0.725, RY + 2.45, -0.1); // 
 const EYE = toW(BLD[0], 0, RU + 0.15, RY + 1.66, -2);
 // the viewer's kitchen: the television on its shelf left of the window (as seen from the room), in the wall frame of house V
 const TVU = RU + 1.22, TVY = RY + 1.72, TVZ = -0.78;
+// the pictures on the televisions: frames in the atlas strip, their pitch in pixels; the channels (FLAT.tv: 0 off,
+// 1 the news, 2 a concert, 3 a talk show, 4 a film about the forest) and the colour each throws into the room
+const TVF = 8, TVS = 200, TVCOL = [[0, 0, 0], [0.35, 0.5, 1.1], [0.9, 0.35, 1.0], [1.0, 0.62, 0.38], [0.55, 0.62, 0.85]];
 
 // street lamps: x, z, yaw of the arm, kind (0 cold LED, 1 old sodium), then the bulbs over the doors are added
 const POLES = [[10.8, 10, PI, 0], [10.8, -22, PI, 0], [-4, -52.5, -PI / 2, 0], [22, -57, PI / 2, 0], [-13, -60, PI, 0], [57, -48, PI, 0],
@@ -108,6 +111,8 @@ const ABAL = [44.55, 45.35, 44.95];
 // the doors in the flat: u, z of the hinge, turn, seed, scale, how far open at first, its doorway (ADOOR; -1 the balcony's)
 const FDOOR = [[41.3, -4.93, 0, 0.1, 1, 1.45, 0], [47.6, -4.93, 0, 0.3, 1, 1.4, 1], [43.3, -6.39, PI, 0.5, 1, 1.25, 3], [44.8, -6.39, PI, 0.7, 1, 1.15, 4], [45.52, -6.33, 0, 0.9, 0.97, 0.4, 5], [ABAL[1], -0.4, PI, 0.2, 1, 0, -1]];
 const APTB = boxW(RU - RW, RY, -11.18, 49, RY + 2.62, RD0);
+// the way out over the balcony's parapet, between it and the slab of the balcony above (as TUN is through the window)
+const BTUN = boxW(ABAL[2] - 0.98, RY + 1.1, 0.45, ABAL[2] + 0.98, RY + 2.5, 1.9);
 // the boxes the camera may be in: each room, each doorway (through the wall and a little into both rooms), in the world
 const AFREE = APT.map(([u0, u1, z0, z1]) => boxW(u0, RY, z0, u1, RY + 2.62, z1)).concat(ADOOR.map(([k, c, a, b, h]) => (k ? boxW(c - 0.5, RY, a, c + 0.5, RY + h, b) : boxW(a, RY, c - 0.5, b, RY + h, c + 0.5))),
   [boxW(ABAL[0], RY, -0.9, ABAL[1], RY + 2.1, 0.3), boxW(ABAL[2] - 1.08, RY, -0.05, ABAL[2] + 1.08, RY + 2.4, 1.03)]); // the balcony door and the balcony
@@ -359,6 +364,22 @@ function meshKitchen() {
   m.mat(M_DARK).bar([u1, TVY - 0.5, TVZ], [TVU - 0.15, TVY - 0.26, TVZ], 0.03);
   m.mat(M_TINT).box(TVU - 0.27, TVY - 0.24, TVZ - 0.24, u1 - 0.02, TVY + 0.16, TVZ + 0.24, 0, 0.7, 1);
   m.mat(M_DARK).box(TVU - 0.276, TVY - 0.2, TVZ - 0.2, TVU - 0.27, TVY + 0.12, TVZ + 0.17); m.bar([TVU, TVY + 0.16, TVZ], [TVU - 0.1, TVY + 0.45, TVZ - 0.15], 0.008); m.bar([TVU, TVY + 0.16, TVZ], [TVU + 0.05, TVY + 0.45, TVZ + 0.15], 0.008);
+  // a pot of soup on the front burner, a frying pan on the back one, a towel over the oven's rail
+  m.mat(M_METAL); p7ring(m, u0 + 0.43, -1.4, [[y + 0.865, 0.1, 0.6], [y + 1.02, 0.105], [y + 1.025, 0.1]], 12, true, false); m.mat(M_CONC); p7cyl(m, u0 + 0.43, y + 1.0, -1.4, 0.1, 0.01, 12);
+  m.mat(M_DARK).bar([u0 + 0.43, y + 1.045, -1.4], [u0 + 0.43, y + 1.07, -1.4], 0.03, 0.03); for (const s of [-1, 1]) m.bar([u0 + 0.43, y + 0.98, -1.4 + s * 0.1], [u0 + 0.43, y + 0.98, -1.4 + s * 0.14], 0.03, 0.015);
+  m.mat(M_DARK); p7ring(m, u0 + 0.43, -1.07, [[y + 0.866, 0.11], [y + 0.9, 0.125]], 12, true, false); m.bar([u0 + 0.43, y + 0.89, -1.07 + 0.12], [u0 + 0.43, y + 0.9, -1.07 + 0.36], 0.025, 0.015);
+  m.mat(M_TINT).box(cu - 0.005, y + 0.42, -1.36, cu + 0.012, y + 0.76, -1.16, 0, 0.6, 1);
+  // over the sink: a drying rack of plates under the cupboards
+  m.mat(M_METAL).box(u0 + 0.02, y + 1.12, -2.75, u0 + 0.3, y + 1.14, -2.2, 0, 0.7, 1);
+  m.mat(M_CONC); for (let k = 0; k < 6; k++) { const z = -2.7 + k * 0.09; m.tube([[u0 + 0.16, y + 1.25, z], [u0 + 0.16, y + 1.25, z + 0.012]], 0.11, 12, 3); }
+  // a bowl of apples on the table, a salt cellar, bread on a board
+  m.mat(M_CONC); p7ring(m, RU - 0.05, -1.1, [[y + 0.76, 0.06], [y + 0.8, 0.12], [y + 0.81, 0.125]], 12, true, false);
+  m.mat(M_RED); for (const [dx, dz] of [[-0.04, 0.02], [0.05, -0.02], [0.0, -0.06], [0.02, 0.06]]) p2ball(m, RU - 0.05 + dx, y + 0.83, -1.1 + dz, 0.038, 4, 8);
+  m.mat(M_BARK).box(RU + 0.25, y + 0.76, -1.28, RU + 0.5, y + 0.775, -1.12); p2ball(m, RU + 0.37, y + 0.81, -1.2, 0.06, 4, 8, 0.55);
+  m.mat(M_CONC); p7ring(m, RU - 0.38, -0.7, [[y + 0.76, 0.018], [y + 0.82, 0.016], [y + 0.83, 0.01]], 6);
+  // the fridge: magnets and a note, a shopping list held by one
+  for (const [z, yy, mt] of [[-4.75, 1.3, M_RED], [-4.62, 1.42, M_YEL], [-4.4, 1.24, M_GRN], [-4.3, 1.4, M_RED], [-4.55, 1.12, M_LENS]]) m.mat(mt).box(u0 + 0.66, y + yy, z, u0 + 0.675, y + yy + 0.04, z + 0.04);
+  m.mat(M_CONC).box(u0 + 0.662, y + 1.05, -4.52, u0 + 0.666, y + 1.3, -4.34);
   return m;
 }
 
@@ -649,7 +670,9 @@ CARS.forEach((c, t) => reg('car' + t, meshCar(t)));
   // --- props
   POLES.forEach(([x, z, a], i) => { solid('lamp', x, 0, z, a, 0, i); boxes.push([x - 0.2, z - 0.2, x + 0.2, z + 0.2, 9]); });
   LAMPS.forEach((l, i) => {
-    if (l.t < 0 && !l.nb) solid('bulb', l.x, l.y + 0.12, l.z, 0, 0, i);
+    // the flat's lights (t < -1) have fittings of their own, and the televisions' glow none at all
+    if (l.t < 0 && l.t > -1.5 && !l.nb) solid('bulb', l.x, l.y + 0.12, l.z, 0, 0, i);
+    if (i === TVL || i === TVL2) return;
     // glare: a cold star on the street lamps, a small warm dot on the bulbs
     glare.push(l.x, l.y - (l.t < 0 ? 0 : 0.06), l.z, l.t < 0 ? 0.5 : 1.5, 0, 0, 0, 100 + i);
   });
@@ -703,6 +726,9 @@ CARS.forEach((c, t) => reg('car' + t, meshCar(t)));
     put('rug', 45.9, -2.7, PI / 2, 0, 0.6); put('coffeeTable', 45.5, -2.6, PI / 2, 0, 0.2);
     put('armchair', 48.25, -1.5, -2.45, 9, 0.7); put('floorLamp', 44.3, -0.95, 0, 6, L(0)); put('plant', 46.55, -0.95, 0.4, 7, 0.4);
     put('piano', 49, -3.65, -PI / 2, 8, 0.8); put('radiator', 47.85, -0.42, PI, 0, 0.2); put('chandelier', 46.4, -2.66, 0, 6, L(0), yc);
+    // the bookcase in the corner, a guitar leaning by the piano, slippers by the sofa, the cat asleep in the armchair
+    put('bookcase', 43.87, -4.0, PI / 2, 0, 0.3); put('guitar', 49, -2.45, -PI / 2, 0, 0.6); put('slippers', 44.95, -2.0, PI / 2 + 0.3, 0, 0.2);
+    { const p = at(48.1, RY + 0.42, -1.62, -2.45); solid('catLying', p[0], p[1], p[2], p[3] + 0.4, 6, 0.3); }
     dec(48.994, RY + 1.95, -3.65, -PI / 2, 0.32, 0.32, 0, 0, 'clock');
     // the corridor: a runner, the lamp, the calendar; the hall: the front door, the coats, the boots, the mirror and the telephone
     put('rug', 43.6, -5.66, PI / 2, 0, 0.9, RY, 0.42); put('plafond', 43.3, -5.66, 0, 0, L(2), yc);
@@ -712,6 +738,9 @@ CARS.forEach((c, t) => reg('car' + t, meshCar(t)));
     // the bedroom: the bed, the bedside lamp on, the wardrobe and the dressing table, a rug, the radiator under the window
     put('bed', 40.35, -8.9, PI / 2, 11, 0.4); put('nightstand', 40.35, -10.2, PI / 2, 6, L(4)); put('wardrobe', 43.5, -8.0, -PI / 2, 8, 0.5);
     put('dresser', 43.5, -9.9, -PI / 2, 8, 0.6); put('rug', 41.9, -8.9, 0, 0, 0.3, RY, 0.55); put('radiator', 42.05, -11.18, 0, 0, 0.7);
+    put('desk', 41.2, -6.42, PI, 8, 0.45); put('slippers', 42.6, -8.4, -PI / 2 + 0.2, 0, 0.7);
+    // the kitchen's sideboard along the wall opposite the stove
+    put('sideboard', RU + RW, -3.0, -PI / 2, 13, 0.3);
     // the bathroom and the toilet
     put('bathtub', 44.51, -8.6, 0, 13, 0.2); put('washbasin', 45.4, -7.25, -PI / 2, 2, 0.4); put('washer', 43.62, -7.3, PI / 2, 0, 0.3);
     put('towelRail', 43.62, -7.3, PI / 2, 11, 0.5, RY + 0.35); put('bathMat', 44.5, -7.6, 0, 7, 0.2); put('wallLamp', 45.4, -6.8, -PI / 2, 0, L(5), RY + 2.0);
@@ -729,8 +758,10 @@ CARS.forEach((c, t) => reg('car' + t, meshCar(t)));
     APT.forEach(([u0, u1, z0, z1], r) => {
       const d = ADOOR.find(([k, c, a, b]) => (k ? (abs(c - u0) < 0.1 || abs(c - u1) < 0.1) && a >= z0 - 0.01 && b <= z1 + 0.01 : (abs(c - z0) < 0.1 || abs(c - z1) < 0.1) && a >= u0 - 0.01 && b <= u1 + 0.01));
       if (!d) return; const [k, c, , b] = d, side = k ? (c > (u0 + u1) / 2 ? -1 : 1) : (c > (z0 + z1) / 2 ? -1 : 1), cf = c + side * 0.075, q = k ? at(cf, RY + 0.93, b + 0.16) : at(b + 0.16, RY + 0.93, cf);
-      USE.push({ p: [q[0], q[1], q[2]], r: 0.2, kind: 'light', i: r });
+      USE.push({ p: [q[0], q[1], q[2]], r: 0.28, kind: 'light', i: r });
     });
+    // the lamps one can reach switch their room too: the floor lamp, the bedside lamp, the bathroom's wall lamp
+    for (const [u, y, z, r] of [[44.3, 1.33, -0.95, 1], [40.55, 0.75, -10.2, 4], [45.26, 2.0, -6.8, 5]]) { const q = at(u, RY + y, z); USE.push({ p: [q[0], q[1], q[2]], r: 0.3, kind: 'light', i: r }); }
     // the televisions and the stove under the kettle
     { const q = at(TVU - 0.28, TVY, TVZ); USE.push({ p: [q[0], q[1], q[2]], r: 0.3, kind: 'tv', i: 0 }); }
     { const q = at(45.5, RY + 1.1, -4.6); USE.push({ p: [q[0], q[1], q[2]], r: 0.4, kind: 'tv', i: 1 }); }

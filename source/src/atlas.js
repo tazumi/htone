@@ -139,10 +139,79 @@ function makeAtlas() {
     for (let j = 0; j < 6; j++) for (let i = 0; i < 18; i++) { c.fillStyle = (i + j) % 7 === 3 ? '#8fb0b8' : '#dfe4e0'; c.fillRect(i * 28.4 + 1, j * 28.4 + 1, 26.4, 26.4); }
     c.fillStyle = 'rgba(0,0,0,.25)'; for (let j = 0; j <= 6; j++) c.fillRect(0, j * 28.4, w, 1.5);
   });
-  cell('tvimg', 192, 160, (w, h) => {
-    const g = c.createLinearGradient(0, 0, 0, h); g.addColorStop(0, '#6a8cc8'); g.addColorStop(1, '#203060'); c.fillStyle = g; c.fillRect(0, 0, w, h);
-    c.fillStyle = '#c8b090'; c.beginPath(); c.arc(w * 0.55, h * 0.42, 20, 0, TAU); c.fill(); c.fillStyle = '#283040'; c.fillRect(w * 0.55 - 40, h * 0.58, 80, h * 0.42);
-    c.fillStyle = '#e8e0c0'; c.fillRect(0, h * 0.8, w, h * 0.12); c.fillStyle = '#c03020'; c.fillRect(6, h * 0.82, 30, h * 0.08);
+  // the television's pictures: TVF frames side by side, TVS apart (the decal shader picks one by the channel and its cuts):
+  // 0 the news, 1 the weather map, 2 a concert from the hall, 3 the singer close, 4 a talk show (a man and a woman),
+  // 5 the woman close, 6 the man close, 7 a film about the winter forest
+  const TVW = 192, TVH = 160;
+  cell('tvimg', TVF * TVS - 8, TVH, () => {
+    const head = (x, y, r, skin = '#d8b090', hair = '#3a2414', long = 0) => {
+      c.fillStyle = hair; if (long) { c.beginPath(); c.ellipse(x, y + r * 0.6, r * 1.25, r * 1.7, 0, 0, TAU); c.fill(); }
+      c.fillStyle = skin; c.beginPath(); c.ellipse(x, y, r * 0.82, r, 0, 0, TAU); c.fill();
+      c.fillStyle = hair; c.beginPath(); c.ellipse(x, y - r * 0.55, r * 0.88, r * 0.55, 0, PI, TAU); c.fill();
+      c.fillStyle = 'rgba(40,20,10,.7)'; c.fillRect(x - r * 0.4, y - r * 0.1, r * 0.2, r * 0.12); c.fillRect(x + r * 0.2, y - r * 0.1, r * 0.2, r * 0.12);
+      c.fillStyle = 'rgba(150,50,40,.8)'; c.fillRect(x - r * 0.25, y + r * 0.45, r * 0.5, r * 0.1);
+    };
+    const body = (x, y, w, h, col, tie) => { c.fillStyle = col; c.beginPath(); c.moveTo(x - w * 0.3, y); c.lineTo(x + w * 0.3, y); c.lineTo(x + w / 2, y + h * 0.3); c.lineTo(x + w / 2, y + h); c.lineTo(x - w / 2, y + h); c.lineTo(x - w / 2, y + h * 0.3); c.closePath(); c.fill(); if (tie) { c.fillStyle = '#e8e8e8'; c.beginPath(); c.moveTo(x - w * 0.12, y); c.lineTo(x + w * 0.12, y); c.lineTo(x, y + h * 0.45); c.fill(); c.fillStyle = tie; c.fillRect(x - w * 0.03, y + h * 0.05, w * 0.06, h * 0.4); } };
+    const logo = (s, col = '#fff') => { c.fillStyle = col; c.globalAlpha = 0.75; c.font = `bold 14px ${FN}`; c.textAlign = 'right'; c.fillText(s, TVW - 8, 18); c.globalAlpha = 1; c.textAlign = 'left'; };
+    const frame = (k, draw) => { c.save(); c.translate(k * TVS, 0); c.beginPath(); c.rect(0, 0, TVW, TVH); c.clip(); draw(TVW, TVH); c.restore(); };
+    frame(0, (w, h) => { // the news: the studio, the anchor at the desk, a picture over the shoulder, the line running along the bottom
+      let g = c.createLinearGradient(0, 0, w, h); g.addColorStop(0, '#2a5aa8'); g.addColorStop(1, '#0c1c48'); c.fillStyle = g; c.fillRect(0, 0, w, h);
+      c.strokeStyle = 'rgba(140,190,255,.25)'; c.lineWidth = 1; for (let x = -h; x < w; x += 14) { c.beginPath(); c.moveTo(x, h); c.lineTo(x + h, 0); c.stroke(); }
+      c.fillStyle = '#d8e4f0'; c.fillRect(14, 22, 64, 44); c.fillStyle = '#7a8aa0'; c.fillRect(16, 46, 60, 18); c.fillStyle = '#a0a8b0'; for (let k = 0; k < 4; k++) c.fillRect(20 + k * 14, 30 + (k & 1) * 4, 9, 20 - (k & 1) * 4);
+      body(118, 92, 76, 60, '#1c2230', '#b02020'); head(118, 70, 19, '#dab496', '#2a1a10');
+      c.fillStyle = '#5a3a20'; c.fillRect(60, 118, 132, 16); c.fillStyle = '#e8e4d8'; c.fillRect(0, 134, w, 16); c.fillStyle = '#c01818'; c.fillRect(0, 134, 44, 16);
+      c.fillStyle = '#fff'; c.font = `bold 10px ${FN}`; c.fillText('НОВОСТИ', 3, 146); c.fillStyle = '#1a1a1a'; c.fillText('СНЕГОПАД В ГОРОДЕ  ·  ДОРОГИ РАСЧИЩАЮТ  ·  -12°', 48, 146); logo('1');
+    });
+    frame(1, (w, h) => { // the weather: a map of the region with the temperatures, clouds and snow over it
+      c.fillStyle = '#1a3a6a'; c.fillRect(0, 0, w, h); c.fillStyle = '#3e7a48'; c.beginPath(); c.moveTo(20, 30); c.bezierCurveTo(70, 10, 150, 20, 180, 50); c.bezierCurveTo(186, 100, 150, 140, 90, 138); c.bezierCurveTo(40, 136, 10, 100, 20, 30); c.fill();
+      c.strokeStyle = 'rgba(255,255,255,.45)'; c.lineWidth = 1; c.beginPath(); c.moveTo(60, 30); c.lineTo(80, 130); c.moveTo(120, 25); c.lineTo(110, 135); c.stroke();
+      c.fillStyle = 'rgba(235,240,250,.85)'; for (const [x, y, r] of [[60, 50, 16], [76, 46, 20], [92, 52, 15], [130, 92, 14], [146, 88, 18]]) { c.beginPath(); c.arc(x, y, r, 0, TAU); c.fill(); }
+      c.fillStyle = '#fff'; for (let k = 0; k < 14; k++) c.fillRect(56 + (k * 37) % 50, 66 + (k * 13) % 18, 2, 2);
+      c.font = `bold 18px ${FB}`; c.fillStyle = '#fff'; c.fillText('-12', 34, 110); c.fillText('-8', 120, 64); c.fillText('-15', 140, 128);
+      c.fillStyle = 'rgba(0,0,0,.4)'; c.fillRect(0, 0, w, 22); c.fillStyle = '#fff'; c.font = `bold 12px ${FN}`; c.fillText('ПОГОДА НА ЗАВТРА', 8, 15); logo('1');
+    });
+    const stage = (w, h, close) => {
+      c.fillStyle = '#06030c'; c.fillRect(0, 0, w, h);
+      const beams = [[30, '#ff3090'], [80, '#40a0ff'], [120, '#ffd040'], [165, '#a040ff']];
+      for (const [x, col] of beams) { const g = c.createLinearGradient(x, 0, w / 2, h); g.addColorStop(0, col); g.addColorStop(1, 'rgba(0,0,0,0)'); c.globalAlpha = 0.45; c.fillStyle = g; c.beginPath(); c.moveTo(x - 4, 0); c.lineTo(x + 4, 0); c.lineTo(w / 2 + (x - w / 2) * 0.2 + 26, h); c.lineTo(w / 2 + (x - w / 2) * 0.2 - 26, h); c.fill(); }
+      c.globalAlpha = 1; for (let k = 0; k < 9; k++) { c.fillStyle = ['#fff2c0', '#ff80c0', '#80c0ff'][k % 3]; c.beginPath(); c.arc(12 + k * 21, 6, 3, 0, TAU); c.fill(); }
+      if (close) {
+        const g = c.createRadialGradient(w / 2, h * 0.5, 8, w / 2, h * 0.5, 110); g.addColorStop(0, 'rgba(255,80,160,.55)'); g.addColorStop(1, 'rgba(40,0,60,0)'); c.fillStyle = g; c.fillRect(0, 0, w, h);
+        for (let k = 0; k < 16; k++) { c.fillStyle = `rgba(${200 + k * 3},${120 + (k * 37) % 120},255,.35)`; c.beginPath(); c.arc((k * 53) % w, 20 + (k * 29) % 70, 4 + k % 5, 0, TAU); c.fill(); }
+        body(w / 2, 96, 96, 70, '#e0e0f0'); head(w / 2, 70, 24, '#e8c0a8', '#d8b060', 1);
+        c.fillStyle = '#222'; c.save(); c.translate(w / 2 + 14, 88); c.rotate(-0.5); c.fillRect(-3, 0, 6, 30); c.beginPath(); c.arc(0, 0, 6, 0, TAU); c.fill(); c.restore();
+      } else {
+        c.fillStyle = '#1a1028'; c.fillRect(0, 92, w, 20); c.fillStyle = '#382848'; c.fillRect(20, 88, w - 40, 6);
+        c.fillStyle = '#f0e8ff'; c.beginPath(); c.arc(w / 2, 62, 6, 0, TAU); c.fill(); c.fillRect(w / 2 - 5, 68, 10, 22);
+        for (const x of [40, 150]) { c.fillStyle = '#2a2236'; c.fillRect(x - 10, 70, 20, 22); c.beginPath(); c.arc(x, 66, 5, 0, TAU); c.fill(); }
+        c.fillStyle = '#000'; for (let k = 0; k < 26; k++) { const x = k * 7.6 + (k & 1) * 3, y = 124 + (k * 7) % 10; c.beginPath(); c.arc(x, y, 6, 0, TAU); c.fill(); c.fillRect(x - 6, y, 12, 40); if (k % 5 === 2) c.fillRect(x - 1, y - 22, 3, 18); }
+      }
+      logo('2', '#ffd0f0');
+    };
+    frame(2, (w, h) => stage(w, h, 0)); frame(3, (w, h) => stage(w, h, 1));
+    const studio = (w, h) => {
+      let g = c.createLinearGradient(0, 0, 0, h); g.addColorStop(0, '#5a2a18'); g.addColorStop(1, '#2a120a'); c.fillStyle = g; c.fillRect(0, 0, w, h);
+      g = c.createRadialGradient(w / 2, 40, 10, w / 2, 40, 120); g.addColorStop(0, 'rgba(255,190,110,.5)'); g.addColorStop(1, 'rgba(255,190,110,0)'); c.fillStyle = g; c.fillRect(0, 0, w, h);
+      c.fillStyle = 'rgba(255,220,160,.3)'; for (let k = 0; k < 7; k++) c.fillRect(8 + k * 27, 10, 14, 60);
+    };
+    frame(4, (w, h) => { // the talk show: the two of them on a sofa, a little table between, the name of the show behind
+      studio(w, h); c.fillStyle = '#f0d8a0'; c.font = `bold 16px ${FB}`; c.textAlign = 'center'; c.fillText('ВЕЧЕР', w / 2, 34); c.textAlign = 'left';
+      c.fillStyle = '#7a1c20'; c.fillRect(14, 104, w - 28, 26); c.fillRect(14, 86, 14, 44); c.fillRect(w - 28, 86, 14, 44);
+      body(58, 84, 40, 44, '#26282e', '#3050a0'); head(58, 68, 13, '#d8b090', '#3a2414');
+      body(134, 84, 38, 44, '#b01830'); head(134, 68, 12, '#e8c0a8', '#5a2a10', 1);
+      c.fillStyle = '#c8b090'; c.fillRect(84, 118, 26, 4); c.fillRect(95, 122, 4, 18); c.fillStyle = '#f0f0f0'; c.fillRect(88, 112, 6, 6); c.fillRect(100, 112, 6, 6);
+      c.fillStyle = '#1a0a06'; c.fillRect(0, 140, w, 20); logo('3', '#ffe0b0');
+    });
+    frame(5, (w, h) => { studio(w, h); body(w / 2, 104, 110, 70, '#b01830'); head(w / 2, 72, 30, '#e8c0a8', '#5a2a10', 1); c.fillStyle = '#f0e0a0'; c.beginPath(); c.arc(w / 2 - 22, 86, 3, 0, TAU); c.arc(w / 2 + 22, 86, 3, 0, TAU); c.fill(); c.fillStyle = 'rgba(0,0,0,.5)'; c.fillRect(10, 128, 120, 18); c.fillStyle = '#fff'; c.font = `bold 11px ${FN}`; c.fillText('ВЕДУЩАЯ', 16, 141); logo('3', '#ffe0b0'); });
+    frame(6, (w, h) => { studio(w, h); body(w / 2, 104, 116, 70, '#26282e', '#3050a0'); head(w / 2, 72, 30, '#d8b090', '#3a2414'); c.fillStyle = '#6a5040'; c.fillRect(w / 2 - 18, 92, 36, 6); c.fillStyle = 'rgba(0,0,0,.5)'; c.fillRect(10, 128, 120, 18); c.fillStyle = '#fff'; c.font = `bold 11px ${FN}`; c.fillText('ГОСТЬ ПРОГРАММЫ', 16, 141); logo('3', '#ffe0b0'); });
+    frame(7, (w, h) => { // a film about the winter forest: hills at dusk, spruces, the moon, an elk on the ridge
+      let g = c.createLinearGradient(0, 0, 0, h); g.addColorStop(0, '#20304a'); g.addColorStop(0.6, '#6a7a9a'); g.addColorStop(1, '#c8d0e0'); c.fillStyle = g; c.fillRect(0, 0, w, h);
+      c.fillStyle = '#f4f0dc'; c.beginPath(); c.arc(150, 30, 12, 0, TAU); c.fill();
+      c.fillStyle = '#8a98b4'; c.beginPath(); c.moveTo(0, 96); c.quadraticCurveTo(60, 60, 120, 90); c.quadraticCurveTo(160, 70, w, 84); c.lineTo(w, h); c.lineTo(0, h); c.fill();
+      c.fillStyle = '#e8ecf4'; c.beginPath(); c.moveTo(0, 120); c.quadraticCurveTo(90, 100, w, 118); c.lineTo(w, h); c.lineTo(0, h); c.fill();
+      c.fillStyle = '#1a2430'; for (const [x, s] of [[14, 1.2], [34, 0.9], [168, 1.3], [184, 1], [150, 0.8]]) { c.beginPath(); c.moveTo(x, 124 - 60 * s); c.lineTo(x + 14 * s, 126); c.lineTo(x - 14 * s, 126); c.fill(); }
+      c.fillStyle = '#2a2420'; c.fillRect(92, 84, 22, 9); c.fillRect(93, 92, 2, 10); c.fillRect(110, 92, 2, 10); c.fillRect(112, 78, 5, 9); c.fillRect(112, 74, 9, 5); logo('4');
+    });
   });
   cell('clock', 128, 128, (w) => {
     c.translate(w / 2, w / 2); c.fillStyle = '#ece6d8'; c.beginPath(); c.arc(0, 0, 60, 0, TAU); c.fill(); c.strokeStyle = '#3a2a1a'; c.lineWidth = 6; c.stroke();

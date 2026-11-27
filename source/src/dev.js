@@ -65,5 +65,5 @@
   };
   // the flight over the town: where it passes closer than 6 m to a house's box (or under its roof)
   const tourCheck = () => { const out = [], T = tourLen / TOURV; for (let t = 0; t < T; t += 0.5) { tourAt(t); for (let i = 0; i < NBX; i++) { const o = i * 5, dx = max(BX[o] - F[CX], 0, F[CX] - BX[o + 2]), dz = max(BX[o + 1] - F[CZ], 0, F[CZ] - BX[o + 3]), dy = max(F[CY] - BX[o + 4], 0); if (hypot(dx, dz, dy) < 6) out.push([t.toFixed(1), F[CX].toFixed(0), F[CY].toFixed(0), F[CZ].toFixed(0), i, BX[o + 4].toFixed(0)].join(' ')); } } return { T, out }; };
-  window.dev = { F, ACT, BX, lookAt, tourCheck, POSES, halt, step, sound, audio: () => ({ AC, OUT }), state: () => ({ dec: nDec, W, H, pix, det, gpu: F[GPU], result, flying, tris: nI / 3, wins: nWin, grass: Wd.grass.n }) };
+  window.dev = { F, ACT, BX, FLAT, lookAt, tourCheck, POSES, halt, step, sound, audio: () => ({ AC, OUT }), state: () => ({ dec: nDec, W, H, pix, det, gpu: F[GPU], result, flying, tris: nI / 3, wins: nWin, grass: Wd.grass.n }) };
 }
