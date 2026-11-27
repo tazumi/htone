@@ -160,7 +160,7 @@ function makeAtlas() {
       c.fillStyle = '#d8e4f0'; c.fillRect(14, 22, 64, 44); c.fillStyle = '#7a8aa0'; c.fillRect(16, 46, 60, 18); c.fillStyle = '#a0a8b0'; for (let k = 0; k < 4; k++) c.fillRect(20 + k * 14, 30 + (k & 1) * 4, 9, 20 - (k & 1) * 4);
       body(118, 92, 76, 60, '#1c2230', '#b02020'); head(118, 70, 19, '#dab496', '#2a1a10');
       c.fillStyle = '#5a3a20'; c.fillRect(60, 118, 132, 16); c.fillStyle = '#e8e4d8'; c.fillRect(0, 134, w, 16); c.fillStyle = '#c01818'; c.fillRect(0, 134, 44, 16);
-      c.fillStyle = '#fff'; c.font = `bold 10px ${FN}`; c.fillText('НОВОСТИ', 3, 146); c.fillStyle = '#1a1a1a'; c.fillText('СНЕГОПАД В ГОРОДЕ  ·  ДОРОГИ РАСЧИЩАЮТ  ·  -12°', 48, 146); logo('1');
+      c.fillStyle = '#fff'; fit('НОВОСТИ', FN, 10, 39, 'bold'); c.fillText('НОВОСТИ', 3, 146); c.fillStyle = '#1a1a1a'; c.font = `bold 10px ${FN}`; c.fillText('СНЕГОПАД В ГОРОДЕ  ·  ДОРОГИ РАСЧИЩАЮТ  ·  -12°', 48, 146); logo('1');
     });
     frame(1, (w, h) => { // the weather: a map of the region with the temperatures, clouds and snow over it
       c.fillStyle = '#1a3a6a'; c.fillRect(0, 0, w, h); c.fillStyle = '#3e7a48'; c.beginPath(); c.moveTo(20, 30); c.bezierCurveTo(70, 10, 150, 20, 180, 50); c.bezierCurveTo(186, 100, 150, 140, 90, 138); c.bezierCurveTo(40, 136, 10, 100, 20, 30); c.fill();
